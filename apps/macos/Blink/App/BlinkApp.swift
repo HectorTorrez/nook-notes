@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct BlinkApp: App {
-    @State private var store = NotesStore()
+    @State private var store = NotesStore(storage: .default)
 
     var body: some Scene {
         Window("Blink", id: "main") {

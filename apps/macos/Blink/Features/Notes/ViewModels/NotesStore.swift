@@ -1,7 +1,9 @@
-import Foundation
+import AppKit
 import Observation
+import os
 
-/// In-memory note management. Always holds at least one note, and one note is always selected.
+/// Note management. Always holds at least one note, and one note is always selected.
+/// When given a storage, changes are written to disk shortly after they happen and on quit.
 @MainActor
 @Observable
 final class NotesStore {
@@ -10,12 +12,55 @@ final class NotesStore {
     private(set) var recentlyDeleted: [Note] = []
 
     @ObservationIgnored private let now: () -> Date
+    @ObservationIgnored private let storage: NotesFileStorage?
+    @ObservationIgnored private var pendingSave: Task<Void, Never>?
+    @ObservationIgnored private var terminationObserver: NSObjectProtocol?
 
-    init(notes: [Note] = [], now: @escaping () -> Date = Date.init) {
+    private static let saveDelay: Duration = .milliseconds(500)
+    private static let logger = Logger(subsystem: "com.hectortorrez.blink", category: "NotesStore")
+
+    init(notes: [Note] = [], storage: NotesFileStorage? = nil, now: @escaping () -> Date = Date.init) {
         self.now = now
-        let initial = notes.isEmpty ? [Note(createdAt: now())] : notes
+        self.storage = storage
+        let snapshot = storage?.load()
+        let loaded = snapshot?.notes ?? notes
+        let initial = loaded.isEmpty ? [Note(createdAt: now())] : loaded
         self.notes = initial
-        self.selectedID = initial[0].id
+        if let saved = snapshot?.selectedID, initial.contains(where: { $0.id == saved }) {
+            self.selectedID = saved
+        } else {
+            self.selectedID = initial[0].id
+        }
+
+        if storage != nil {
+            terminationObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.willTerminateNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.saveNow() }
+            }
+        }
+    }
+
+    /// Writes any pending changes immediately.
+    func saveNow() {
+        pendingSave?.cancel()
+        pendingSave = nil
+        guard let storage else { return }
+        do {
+            try storage.save(NotesSnapshot(notes: notes, selectedID: selectedID))
+        } catch {
+            Self.logger.error("Failed to save notes: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func scheduleSave() {
+        guard storage != nil else { return }
+        pendingSave?.cancel()
+        pendingSave = Task { [weak self] in
+            try? await Task.sleep(for: Self.saveDelay)
+            guard !Task.isCancelled else { return }
+            self?.saveNow()
+        }
     }
 
     var selectedNote: Note {
@@ -33,6 +78,7 @@ final class NotesStore {
     func select(_ id: Note.ID) {
         guard notes.contains(where: { $0.id == id }) else { return }
         selectedID = id
+        scheduleSave()
     }
 
     /// Reuses the selected note when it is still empty instead of piling up blank notes.
@@ -41,6 +87,7 @@ final class NotesStore {
         let note = Note(createdAt: now())
         notes.append(note)
         selectedID = note.id
+        scheduleSave()
     }
 
     func updateSelectedContent(_ content: String) {
@@ -49,6 +96,7 @@ final class NotesStore {
         else { return }
         notes[index].content = content
         notes[index].modifiedAt = now()
+        scheduleSave()
     }
 
     func deleteNote(_ id: Note.ID) {
@@ -63,6 +111,7 @@ final class NotesStore {
         if selectedID == id {
             selectedID = notesByRecency[0].id
         }
+        scheduleSave()
     }
 
     func restoreLastDeleted() {
@@ -72,5 +121,6 @@ final class NotesStore {
         }
         notes.append(note)
         selectedID = note.id
+        scheduleSave()
     }
 }

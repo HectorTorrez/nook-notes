@@ -1,6 +1,6 @@
 import Foundation
 
-struct Note: Identifiable, Equatable, Sendable {
+struct Note: Identifiable, Equatable, Sendable, Codable {
     let id: UUID
     var content: String
     let createdAt: Date

@@ -14,8 +14,17 @@
 - Multiple notes with quick search and switching
 - Adjustable font size and background opacity
 - Keyboard-first: `⌘K` opens the action panel for creating, browsing, copying, deleting, and restoring notes
+- Notes save automatically as you type
 
-> **Heads up:** notes currently live in memory only and are cleared when you quit Blink. Persistence is on the roadmap.
+## Where your notes live
+
+Blink stores everything in a single JSON file on your Mac:
+
+```
+~/Library/Application Support/Blink/notes.json
+```
+
+Back it up, sync it, or delete it to start fresh. If the file ever becomes unreadable, Blink moves it aside as `notes.corrupt-<timestamp>.json` instead of overwriting it.
 
 ## Requirements
 
