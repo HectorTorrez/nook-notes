@@ -4,16 +4,21 @@ struct NotesView: View {
     let store: NotesStore
 
     @State private var panel: NotesPanel?
+    @State private var notesListedAt = Date()
     @State private var showsCopyConfirmation = false
     @State private var isHovering = false
+    @State private var isWorkspaceHovering = false
     @State private var titleBarHeight: CGFloat = 40
     @AppStorage("fontSize") private var fontSize: Double = 16
     @AppStorage("backgroundOpacity") private var backgroundOpacity: Double = 0.75
+    @AppStorage(Theme.accentPaletteKey) private var accentPalette: AccentPalette = Theme.defaultAccentPalette
 
     /// Clears the traffic lights on the leading edge of the title bar.
     private static let trafficLightsWidth: CGFloat = 86
 
     private var note: Note { store.selectedNote }
+
+    private var accent: Color { accentPalette.color }
 
     /// Controls stay visible while one of their popovers is open so it keeps its anchor.
     private var showsControls: Bool {
@@ -22,7 +27,7 @@ struct NotesView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            NotesTextEditor(noteID: note.id, text: contentBinding, fontSize: fontSize)
+            NotesTextEditor(noteID: note.id, text: contentBinding, fontSize: fontSize, caretColor: accent)
                 .overlay(alignment: .topLeading) { placeholder }
                 .overlay(alignment: .bottom) { footer }
                 .padding(.top, titleBarHeight)
@@ -49,10 +54,13 @@ struct NotesView: View {
             perform: perform,
             showActions: { panel = .actions }
         ))
+        .environment(\.themeAccent, accent)
     }
 
     private var header: some View {
         HStack(spacing: 8) {
+            workspaceSwitcher
+
             Text(note.title)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
@@ -71,6 +79,46 @@ struct NotesView: View {
         .padding(.trailing, 10)
     }
 
+    private var workspaceSwitcher: some View {
+        Button {
+            panel = .workspaces
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "square.stack.3d.up.fill")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(accent)
+                Text(store.activeWorkspace.name)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(isWorkspaceHovering ? -180 : 0))
+            }
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 9)
+            .frame(height: 24)
+            .frame(maxWidth: 170)
+            .background {
+                Capsule(style: .continuous)
+                    .fill(Color.primary.opacity(isWorkspaceHovering ? 0.12 : 0.07))
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.18)) { isWorkspaceHovering = hovering }
+        }
+        .help("Workspaces (⇧⌘O)")
+        .accessibilityLabel("Workspaces, \(store.activeWorkspace.name)")
+        .popover(isPresented: isPresented(.workspaces), arrowEdge: .bottom) {
+            WorkspacesPanel(store: store) {
+                panel = nil
+            }
+        }
+    }
+
     private var actionBar: some View {
         GlassGroup {
             HStack(spacing: 0) {
@@ -82,10 +130,10 @@ struct NotesView: View {
                 }
 
                 ChromeButton(systemImage: "square.stack", help: "Browse Notes (⌘P)") {
-                    panel = .notes
+                    showNotes()
                 }
                 .popover(isPresented: isPresented(.notes), arrowEdge: .bottom) {
-                    NotesBrowser(store: store) { id in
+                    NotesBrowser(store: store, listedAt: notesListedAt) { id in
                         panel = nil
                         store.select(id)
                     }
@@ -184,6 +232,11 @@ struct NotesView: View {
         )
     }
 
+    private func showNotes() {
+        notesListedAt = Date()
+        panel = .notes
+    }
+
     private func isPresented(_ target: NotesPanel) -> Binding<Bool> {
         Binding(
             get: { panel == target },
@@ -198,10 +251,15 @@ struct NotesView: View {
         switch action {
         case .newNote:
             store.createNote()
+        case .switchWorkspace:
+            Task {
+                try? await Task.sleep(for: .milliseconds(150))
+                panel = .workspaces
+            }
         case .browseNotes:
             Task {
                 try? await Task.sleep(for: .milliseconds(150))
-                panel = .notes
+                showNotes()
             }
         case .copyNote:
             note.copyToPasteboard()
@@ -239,22 +297,25 @@ private struct ChromeButton: View {
     let help: String
     let action: () -> Void
 
+    @Environment(\.themeAccent) private var accent
     @State private var isHovering = false
 
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.primary)
+                .foregroundStyle(isHovering ? accent : .primary)
                 .frame(width: 30, height: 24)
                 .background {
                     Capsule(style: .continuous)
-                        .fill(Color.primary.opacity(isHovering ? 0.08 : 0))
+                        .fill(isHovering ? accent.opacity(0.18) : .clear)
                 }
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.14)) { isHovering = hovering }
+        }
         .help(help)
         .accessibilityLabel(help)
     }

@@ -13,6 +13,7 @@ struct NoteCommands: Commands {
             Button("Show Actions") { handler?.showActions() }
                 .keyboardShortcut("k")
                 .disabled(handler == nil)
+            button(for: .switchWorkspace)
             button(for: .browseNotes)
             Divider()
             button(for: .copyNote)

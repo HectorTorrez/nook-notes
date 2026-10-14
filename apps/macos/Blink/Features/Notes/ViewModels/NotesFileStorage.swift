@@ -5,7 +5,8 @@ struct NotesSnapshot: Codable, Equatable, Sendable {
     var selectedID: Note.ID
 }
 
-/// Reads and writes notes as a JSON file.
+/// Reads and writes the workspace library as a JSON file.
+/// Files saved before workspaces existed are loaded as a single Personal workspace.
 struct NotesFileStorage: Sendable {
     let url: URL
 
@@ -16,19 +17,21 @@ struct NotesFileStorage: Sendable {
 
     /// Returns `nil` when nothing has been saved yet. A file that can't be decoded is moved aside
     /// (never overwritten) so the user's data can still be recovered by hand.
-    func load() -> NotesSnapshot? {
+    func load() -> LibrarySnapshot? {
         guard let data = try? Data(contentsOf: url) else { return nil }
-        do {
-            return try Self.decoder.decode(NotesSnapshot.self, from: data)
-        } catch {
-            let stamp = Int(Date().timeIntervalSince1970)
-            let backup = url.deletingPathExtension().appendingPathExtension("corrupt-\(stamp).json")
-            try? FileManager.default.moveItem(at: url, to: backup)
-            return nil
+        if let library = try? Self.decoder.decode(LibrarySnapshot.self, from: data) {
+            return library
         }
+        if let legacy = try? Self.decoder.decode(NotesSnapshot.self, from: data) {
+            return LibrarySnapshot(migrating: legacy)
+        }
+        let stamp = Int(Date().timeIntervalSince1970)
+        let backup = url.deletingPathExtension().appendingPathExtension("corrupt-\(stamp).json")
+        try? FileManager.default.moveItem(at: url, to: backup)
+        return nil
     }
 
-    func save(_ snapshot: NotesSnapshot) throws {
+    func save(_ snapshot: LibrarySnapshot) throws {
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true
         )

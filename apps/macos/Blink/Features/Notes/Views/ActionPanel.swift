@@ -9,7 +9,8 @@ struct ActionPanel: View {
             placeholder: "Search actions",
             emptyMessage: "No matching actions",
             items: NoteAction.allCases,
-            rowHeight: 36,
+            rowHeight: 38,
+            emptyIcon: "command",
             matches: { action, query in
                 action.title.localizedCaseInsensitiveContains(query)
             },
@@ -40,13 +41,14 @@ struct ActionPanel: View {
         switch action {
         case .restoreLastDeleted: store.lastDeleted != nil
         case .copyNote: !store.selectedNote.isEmpty
-        case .newNote, .browseNotes, .deleteNote: true
+        case .newNote, .switchWorkspace, .browseNotes, .deleteNote: true
         }
     }
 
     private func detail(for action: NoteAction) -> String? {
         switch action {
         case .restoreLastDeleted: store.lastDeleted?.title
+        case .switchWorkspace: store.activeWorkspace.name
         case .browseNotes: store.notes.count == 1 ? "1 note" : "\(store.notes.count) notes"
         default: nil
         }

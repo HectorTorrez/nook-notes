@@ -5,12 +5,11 @@ struct NotesTextEditor: NSViewRepresentable {
     var noteID: Note.ID
     @Binding var text: String
     var fontSize: CGFloat
+    var caretColor: Color
 
     static let horizontalInset: CGFloat = 24
     static let topInset: CGFloat = 6
     static let lineSpacing: CGFloat = 6
-
-    private static let caretColor = NSColor(srgbRed: 0.91, green: 0.29, blue: 0.24, alpha: 1)
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -44,7 +43,7 @@ struct NotesTextEditor: NSViewRepresentable {
         textView.isAutomaticTextReplacementEnabled = false
         textView.isAutomaticLinkDetectionEnabled = false
         textView.isAutomaticDataDetectionEnabled = false
-        textView.insertionPointColor = Self.caretColor
+        textView.insertionPointColor = NSColor(caretColor)
         textView.setAccessibilityLabel("Note")
 
         context.coordinator.noteID = noteID
@@ -61,6 +60,8 @@ struct NotesTextEditor: NSViewRepresentable {
         guard let textView = scrollView.documentView as? NSTextView else { return }
         let coordinator = context.coordinator
         coordinator.parent = self
+
+        textView.insertionPointColor = NSColor(caretColor)
 
         if coordinator.noteID != noteID {
             coordinator.noteID = noteID

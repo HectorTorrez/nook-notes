@@ -11,14 +11,15 @@
 ## Features
 
 - Minimal translucent window that stays out of your way
+- Workspaces keep separate sets of notes. Existing notes start in Personal
 - Multiple notes with quick search and switching
-- Adjustable font size and background opacity
+- Adjustable accent color, font size, and background opacity
 - Keyboard-first: `⌘K` opens the action panel for creating, browsing, copying, deleting, and restoring notes
 - Notes save automatically as you type
 
 ## Where your notes live
 
-Blink stores everything in a single JSON file on your Mac:
+Blink stores every workspace and its notes in a single JSON file on your Mac:
 
 ```
 ~/Library/Application Support/Blink/notes.json

@@ -13,13 +13,8 @@ struct IconTile: View {
             .frame(width: size, height: size)
             .background {
                 RoundedRectangle(cornerRadius: size * 0.3, style: .continuous)
-                    .fill(tint.gradient)
+                    .fill(tint)
             }
-            .overlay {
-                RoundedRectangle(cornerRadius: size * 0.3, style: .continuous)
-                    .strokeBorder(.white.opacity(0.22), lineWidth: 0.5)
-            }
-            .shadow(color: tint.opacity(0.3), radius: 2, y: 1)
             .accessibilityHidden(true)
     }
 }
