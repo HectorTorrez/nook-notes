@@ -153,11 +153,12 @@ final class NotesStore {
         scheduleSave()
     }
 
-    func updateSelectedContent(_ content: String) {
-        guard selectedNote.content != content else { return }
+    func updateSelectedContent(_ content: String, richTextData: Data?) {
+        guard selectedNote.content != content || selectedNote.richTextData != richTextData else { return }
         updateActive { workspace in
             guard let index = workspace.notes.firstIndex(where: { $0.id == workspace.selectedNoteID }) else { return }
             workspace.notes[index].content = content
+            workspace.notes[index].richTextData = richTextData
             workspace.notes[index].modifiedAt = now()
         }
         scheduleSave()

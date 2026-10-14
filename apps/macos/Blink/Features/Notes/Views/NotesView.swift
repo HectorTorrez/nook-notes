@@ -9,6 +9,7 @@ struct NotesView: View {
     @State private var isHovering = false
     @State private var isWorkspaceHovering = false
     @State private var titleBarHeight: CGFloat = 40
+    @State private var formatController = RichTextController()
     @AppStorage("fontSize") private var fontSize: Double = 16
     @AppStorage("backgroundOpacity") private var backgroundOpacity: Double = 0.75
     @AppStorage(Theme.accentPaletteKey) private var accentPalette: AccentPalette = Theme.defaultAccentPalette
@@ -27,10 +28,18 @@ struct NotesView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            NotesTextEditor(noteID: note.id, text: contentBinding, fontSize: fontSize, caretColor: accent)
-                .overlay(alignment: .topLeading) { placeholder }
-                .overlay(alignment: .bottom) { footer }
-                .padding(.top, titleBarHeight)
+            NotesTextEditor(
+                noteID: note.id,
+                text: note.content,
+                richTextData: note.richTextData,
+                fontSize: fontSize,
+                caretColor: accent,
+                controller: formatController,
+                onChange: { store.updateSelectedContent($0, richTextData: $1) }
+            )
+            .overlay(alignment: .topLeading) { placeholder }
+            .overlay(alignment: .bottom) { footer }
+            .padding(.top, titleBarHeight)
 
             header
                 .frame(height: titleBarHeight)
@@ -48,12 +57,18 @@ struct NotesView: View {
             )
             .ignoresSafeArea()
         }
+        .background {
+            WindowSizeRecorder()
+                .ignoresSafeArea()
+        }
         .animation(.easeOut(duration: 0.18), value: showsControls)
+        .animation(.easeOut(duration: 0.18), value: formatController.hasSelection)
         .navigationTitle(note.title)
         .focusedSceneValue(\.notesCommandHandler, NotesCommandHandler(
             perform: perform,
             showActions: { panel = .actions }
         ))
+        .focusedSceneValue(\.richTextController, formatController)
         .environment(\.themeAccent, accent)
     }
 
@@ -165,17 +180,22 @@ struct NotesView: View {
     private var footer: some View {
         GlassGroup {
             ZStack {
-                if showsControls || showsCopyConfirmation {
-                    wordCount
-                        .transition(.opacity)
-                }
-
-                if showsControls {
-                    HStack {
-                        Spacer()
-                        appearanceButton
+                if formatController.hasSelection {
+                    FormatToolbar(controller: formatController)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                } else {
+                    if showsControls || showsCopyConfirmation {
+                        wordCount
+                            .transition(.opacity)
                     }
-                    .transition(.opacity)
+
+                    if showsControls {
+                        HStack {
+                            Spacer()
+                            appearanceButton
+                        }
+                        .transition(.opacity)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 32)
@@ -223,13 +243,6 @@ struct NotesView: View {
     private var wordCountLabel: String {
         let count = note.content.split(whereSeparator: \.isWhitespace).count
         return count == 1 ? "1 word" : "\(count) words"
-    }
-
-    private var contentBinding: Binding<String> {
-        Binding(
-            get: { store.selectedNote.content },
-            set: { store.updateSelectedContent($0) }
-        )
     }
 
     private func showNotes() {
