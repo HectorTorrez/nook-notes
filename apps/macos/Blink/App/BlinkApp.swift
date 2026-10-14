@@ -9,7 +9,7 @@ struct BlinkApp: App {
             NotesView(store: store)
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 520, height: 360)
+        .defaultSize(WindowSize.restored)
         .windowResizability(.contentMinSize)
         .commands {
             NoteCommands(store: store)

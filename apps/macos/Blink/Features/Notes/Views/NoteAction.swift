@@ -82,6 +82,7 @@ struct NotesCommandHandler {
 
 extension FocusedValues {
     @Entry var notesCommandHandler: NotesCommandHandler?
+    @Entry var richTextController: RichTextController?
 }
 
 extension Note {
