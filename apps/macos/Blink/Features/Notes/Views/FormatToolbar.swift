@@ -1,9 +1,13 @@
 import SwiftUI
 
-/// The floating formatting bar shown while text is selected. Mirrors the
-/// heading, character-style and list menus into the note editor.
+/// The floating formatting bar, shown while text is selected or pinned open from
+/// the letter button. Mirrors the heading, character-style, list and appearance
+/// controls into the note editor.
 struct FormatToolbar: View {
     let controller: RichTextController
+    @Binding var backgroundOpacity: Double
+    @Binding var fontSize: Double
+    let onDismiss: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
@@ -36,12 +40,19 @@ struct FormatToolbar: View {
                 separator
 
                 ListMenuButton(controller: controller)
+
+                separator
+
+                AppearanceMenuButton(
+                    backgroundOpacity: $backgroundOpacity,
+                    fontSize: $fontSize
+                )
             }
             .padding(3)
             .formatGlass(in: Capsule())
 
             Button {
-                controller.dismiss()
+                onDismiss()
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 11, weight: .bold))
@@ -50,7 +61,7 @@ struct FormatToolbar: View {
                     .background(Circle().fill(Color.black))
                     .contentShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PointerButtonStyle())
             .help("Dismiss")
             .accessibilityLabel("Dismiss formatting bar")
         }
@@ -77,7 +88,7 @@ private struct HeadingMenuButton: View {
                 Text("H").font(.system(size: 14, weight: .semibold, design: .serif))
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PointerButtonStyle())
         .popover(isPresented: $shown, arrowEdge: .top) {
             VStack(spacing: 2) {
                 ForEach(HeadingLevel.allCases) { level in
@@ -93,7 +104,7 @@ private struct HeadingMenuButton: View {
                             Text("H").font(.system(size: 13, weight: .semibold, design: .serif))
                         }
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PointerButtonStyle())
                 }
             }
             .padding(6)
@@ -118,7 +129,7 @@ private struct TextStyleMenuButton: View {
                 Text("I").font(.system(size: 14, weight: .semibold, design: .serif))
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PointerButtonStyle())
         .popover(isPresented: $shown, arrowEdge: .top) {
             VStack(spacing: 2) {
                 Button {
@@ -129,7 +140,7 @@ private struct TextStyleMenuButton: View {
                         Text("B").font(.system(size: 13, weight: .bold, design: .serif))
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PointerButtonStyle())
 
                 Button {
                     controller.toggleItalic()
@@ -139,7 +150,7 @@ private struct TextStyleMenuButton: View {
                         Text("I").font(.system(size: 13, weight: .medium, design: .serif)).italic()
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PointerButtonStyle())
 
                 Button {
                     controller.toggleStrikethrough()
@@ -153,7 +164,7 @@ private struct TextStyleMenuButton: View {
                         Text("S").font(.system(size: 13, weight: .medium, design: .serif)).strikethrough()
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PointerButtonStyle())
 
                 Button {
                     controller.toggleUnderline()
@@ -163,7 +174,7 @@ private struct TextStyleMenuButton: View {
                         Text("U").font(.system(size: 13, weight: .medium, design: .serif)).underline()
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PointerButtonStyle())
             }
             .padding(6)
             .frame(width: 250)
@@ -184,7 +195,7 @@ private struct ListMenuButton: View {
                     .font(.system(size: 13, weight: .medium))
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PointerButtonStyle())
         .popover(isPresented: $shown, arrowEdge: .top) {
             VStack(spacing: 2) {
                 ForEach(ListStyle.allCases) { style in
@@ -201,7 +212,7 @@ private struct ListMenuButton: View {
                                 .font(.system(size: 13, weight: .medium))
                         }
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PointerButtonStyle())
                 }
             }
             .padding(6)
@@ -234,7 +245,7 @@ private struct AlignmentMenuButton: View {
                     .font(.system(size: 13, weight: .medium))
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PointerButtonStyle())
         .popover(isPresented: $shown, arrowEdge: .top) {
             VStack(spacing: 2) {
                 ForEach(Self.options, id: \.title) { option in
@@ -251,7 +262,7 @@ private struct AlignmentMenuButton: View {
                                 .font(.system(size: 13, weight: .medium))
                         }
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PointerButtonStyle())
                 }
             }
             .padding(6)
@@ -259,6 +270,27 @@ private struct AlignmentMenuButton: View {
         }
         .help("Alignment")
         .accessibilityLabel("Alignment")
+    }
+}
+
+private struct AppearanceMenuButton: View {
+    @Binding var backgroundOpacity: Double
+    @Binding var fontSize: Double
+    @State private var shown = false
+
+    var body: some View {
+        Button { shown.toggle() } label: {
+            FormatMenuLabel(isOpen: shown) {
+                Image(systemName: "textformat.size")
+                    .font(.system(size: 13, weight: .medium))
+            }
+        }
+        .buttonStyle(PointerButtonStyle())
+        .popover(isPresented: $shown, arrowEdge: .top) {
+            AppearancePanel(backgroundOpacity: $backgroundOpacity, fontSize: $fontSize)
+        }
+        .help("Appearance")
+        .accessibilityLabel("Appearance")
     }
 }
 
@@ -278,7 +310,7 @@ private struct LinkButton: View {
                 .frame(width: 30, height: 26)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PointerButtonStyle())
         .popover(isPresented: $shown, arrowEdge: .top) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Link")
@@ -293,9 +325,11 @@ private struct LinkButton: View {
                             controller.applyLink(nil)
                             shown = false
                         }
+                        .buttonStyle(PointerButtonStyle())
                     }
                     Spacer()
                     Button("Apply", action: apply)
+                        .buttonStyle(PointerButtonStyle())
                         .keyboardShortcut(.defaultAction)
                 }
             }
@@ -361,7 +395,7 @@ private struct FormatIconButton: View {
                 }
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PointerButtonStyle())
         .onHover { hovering = $0 }
         .help(help)
         .accessibilityLabel(help)

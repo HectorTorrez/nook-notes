@@ -111,7 +111,7 @@ struct WorkspacesPanel: View {
                 .onSubmit(commitName)
             if isRenaming {
                 Button("Cancel", action: cancelRename)
-                    .buttonStyle(.plain)
+                    .buttonStyle(PointerButtonStyle())
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
             } else if !draft.isEmpty {
@@ -122,7 +122,7 @@ struct WorkspacesPanel: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(accent)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PointerButtonStyle())
                 .help("Create workspace")
             }
         }
@@ -162,7 +162,7 @@ struct WorkspacesPanel: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(Color.black.opacity(0.9))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PointerButtonStyle())
     }
 
     private func commitName() {

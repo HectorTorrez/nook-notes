@@ -92,7 +92,7 @@ struct AppearancePanel: View {
                         }
                         .contentShape(Circle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PointerButtonStyle())
                     .help(palette.title)
                     .accessibilityLabel(palette.title)
                     .accessibilityAddTraits(accentPalette == palette ? .isSelected : [])

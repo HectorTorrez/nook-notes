@@ -84,7 +84,7 @@ struct SearchPanel<Item: Identifiable, Row: View, Trailing: View>: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.tertiary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PointerButtonStyle())
                 .accessibilityLabel("Clear search")
             }
         }
@@ -121,7 +121,7 @@ struct SearchPanel<Item: Identifiable, Row: View, Trailing: View>: View {
                                 .frame(height: rowHeight)
                                 .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PointerButtonStyle())
                         .disabled(!enabled)
                         .overlay(alignment: .trailing) {
                             let trailingVisible = hoveredID == item.id || showsTrailing(item)

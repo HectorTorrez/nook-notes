@@ -144,7 +144,7 @@ struct RowActionButton: View {
                 }
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PointerButtonStyle())
         .help(help)
         .accessibilityLabel(help)
         .onHover { isHovering = $0 }

@@ -71,7 +71,6 @@ enum NotesPanel {
     case actions
     case notes
     case workspaces
-    case appearance
 }
 
 /// Routes menu-bar commands to the key notes window.

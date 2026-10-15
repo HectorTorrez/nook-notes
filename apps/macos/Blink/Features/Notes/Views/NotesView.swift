@@ -8,6 +8,7 @@ struct NotesView: View {
     @State private var showsCopyConfirmation = false
     @State private var isHovering = false
     @State private var isWorkspaceHovering = false
+    @State private var isFormatBarPinned = false
     @State private var titleBarHeight: CGFloat = 40
     @State private var formatController = RichTextController()
     @AppStorage("fontSize") private var fontSize: Double = 16
@@ -24,6 +25,11 @@ struct NotesView: View {
     /// Controls stay visible while one of their popovers is open so it keeps its anchor.
     private var showsControls: Bool {
         isHovering || panel != nil
+    }
+
+    /// The formatting bar shows while text is selected or when pinned open from the letter button.
+    private var showsFormatBar: Bool {
+        formatController.hasSelection || isFormatBarPinned
     }
 
     var body: some View {
@@ -62,7 +68,7 @@ struct NotesView: View {
                 .ignoresSafeArea()
         }
         .animation(.easeOut(duration: 0.18), value: showsControls)
-        .animation(.easeOut(duration: 0.18), value: formatController.hasSelection)
+        .animation(.easeOut(duration: 0.18), value: showsFormatBar)
         .navigationTitle(note.title)
         .focusedSceneValue(\.notesCommandHandler, NotesCommandHandler(
             perform: perform,
@@ -121,7 +127,7 @@ struct NotesView: View {
             }
             .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PointerButtonStyle())
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.18)) { isWorkspaceHovering = hovering }
         }
@@ -180,9 +186,14 @@ struct NotesView: View {
     private var footer: some View {
         GlassGroup {
             ZStack {
-                if formatController.hasSelection {
-                    FormatToolbar(controller: formatController)
-                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                if showsFormatBar {
+                    FormatToolbar(
+                        controller: formatController,
+                        backgroundOpacity: $backgroundOpacity,
+                        fontSize: $fontSize,
+                        onDismiss: dismissFormatBar
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
                 } else {
                     if showsControls || showsCopyConfirmation {
                         wordCount
@@ -192,7 +203,7 @@ struct NotesView: View {
                     if showsControls {
                         HStack {
                             Spacer()
-                            appearanceButton
+                            textOptionsButton
                         }
                         .transition(.opacity)
                     }
@@ -223,23 +234,26 @@ struct NotesView: View {
         .allowsHitTesting(false)
     }
 
-    private var appearanceButton: some View {
+    private var textOptionsButton: some View {
         Button {
-            panel = .appearance
+            withAnimation(.easeOut(duration: 0.18)) { isFormatBarPinned = true }
         } label: {
-            Image(systemName: "textformat.size")
+            Image(systemName: "textformat")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.primary)
                 .frame(width: 32, height: 32)
                 .glass(in: Circle(), interactive: true)
         }
-        .buttonStyle(.plain)
-        .help("Appearance")
-        .accessibilityLabel("Appearance")
-        .popover(isPresented: isPresented(.appearance), arrowEdge: .top) {
-            AppearancePanel(backgroundOpacity: $backgroundOpacity, fontSize: $fontSize)
-        }
+        .buttonStyle(PointerButtonStyle())
+        .help("Text Options")
+        .accessibilityLabel("Text Options")
     }
+
+    private func dismissFormatBar() {
+        isFormatBarPinned = false
+        formatController.dismiss()
+    }
+
     private var wordCountLabel: String {
         let count = note.content.split(whereSeparator: \.isWhitespace).count
         return count == 1 ? "1 word" : "\(count) words"
@@ -325,7 +339,7 @@ private struct ChromeButton: View {
                 }
                 .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PointerButtonStyle())
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.14)) { isHovering = hovering }
         }
