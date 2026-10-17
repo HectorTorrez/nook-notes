@@ -41,7 +41,8 @@ struct NotesView: View {
                 fontSize: fontSize,
                 caretColor: accent,
                 controller: formatController,
-                onChange: { store.updateSelectedContent($0, richTextData: $1) }
+                onChange: { store.updateSelectedContent($0, richTextData: $1) },
+                onEscape: dismissFormatBarIfNeeded
             )
             .overlay(alignment: .topLeading) { placeholder }
             .overlay(alignment: .bottom) { footer }
@@ -252,6 +253,14 @@ struct NotesView: View {
     private func dismissFormatBar() {
         isFormatBarPinned = false
         formatController.dismiss()
+    }
+
+    /// Escape clears the selection and unpins the bar, but only while it is shown
+    /// so the text view keeps its default Escape behavior otherwise.
+    private func dismissFormatBarIfNeeded() -> Bool {
+        guard showsFormatBar else { return false }
+        dismissFormatBar()
+        return true
     }
 
     private var wordCountLabel: String {
