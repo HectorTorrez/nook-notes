@@ -9,6 +9,9 @@ struct NotesTextEditor: NSViewRepresentable {
     var caretColor: Color
     var controller: RichTextController
     var onChange: (String, Data?) -> Void
+    /// Handles Escape while the editor is focused. Return `true` to consume the
+    /// key, or `false` to let the text view's default behavior run.
+    var onEscape: () -> Bool
 
     static let horizontalInset: CGFloat = 24
     static let topInset: CGFloat = 6
@@ -19,18 +22,25 @@ struct NotesTextEditor: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSTextView.scrollableTextView()
-        guard let textView = scrollView.documentView as? NSTextView else {
-            return scrollView
-        }
-
+        let scrollView = NSScrollView()
         scrollView.drawsBackground = false
         scrollView.borderType = .noBorder
         scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
         scrollView.scrollerStyle = .overlay
         scrollView.automaticallyAdjustsContentInsets = false
         scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 52, right: 0)
+
+        let textView = NotesTextView(frame: .zero)
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+        scrollView.documentView = textView
 
         textView.delegate = context.coordinator
         textView.isRichText = true
@@ -47,6 +57,10 @@ struct NotesTextEditor: NSViewRepresentable {
         textView.isAutomaticDataDetectionEnabled = false
         textView.insertionPointColor = NSColor(caretColor)
         textView.setAccessibilityLabel("Note")
+
+        textView.onCancel = { [weak coordinator = context.coordinator] in
+            coordinator?.parent.onEscape() ?? false
+        }
 
         context.coordinator.noteID = noteID
         context.coordinator.appliedFontSize = fontSize
@@ -139,5 +153,16 @@ struct NotesTextEditor: NSViewRepresentable {
                 textView.textStorage?.setAttributes(baseAttributes, range: range)
             }
         }
+    }
+}
+
+/// Editor text view that lets Escape dismiss the floating formatting bar by
+/// clearing the current selection.
+final class NotesTextView: NSTextView {
+    var onCancel: (() -> Bool)?
+
+    override func cancelOperation(_ sender: Any?) {
+        if onCancel?() == true { return }
+        super.cancelOperation(sender)
     }
 }

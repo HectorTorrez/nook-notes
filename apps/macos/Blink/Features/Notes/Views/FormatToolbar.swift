@@ -62,7 +62,7 @@ struct FormatToolbar: View {
                     .contentShape(Circle())
             }
             .buttonStyle(PointerButtonStyle())
-            .help("Dismiss")
+            .help("Dismiss (esc)")
             .accessibilityLabel("Dismiss formatting bar")
         }
         .fixedSize()
