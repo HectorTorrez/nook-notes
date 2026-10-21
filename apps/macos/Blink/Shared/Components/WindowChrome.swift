@@ -40,6 +40,9 @@ final class WindowChromeView: NSView {
         window.titlebarAppearsTransparent = true
         window.titlebarSeparatorStyle = .none
         window.styleMask.insert(.fullSizeContentView)
+        // Keep the note in place when the desktop is clicked ("Show Desktop"),
+        // so a click outside the window only changes focus.
+        window.collectionBehavior.insert(.stationary)
 
         DispatchQueue.main.async { [weak self] in
             guard let self, let window = self.window else { return }
