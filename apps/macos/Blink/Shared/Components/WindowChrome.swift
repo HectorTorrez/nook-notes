@@ -43,6 +43,8 @@ final class WindowChromeView: NSView {
         // Keep the note in place when the desktop is clicked ("Show Desktop"),
         // so a click outside the window only changes focus.
         window.collectionBehavior.insert(.stationary)
+        // Float above other apps so the note stays visible while working elsewhere.
+        window.level = .floating
 
         DispatchQueue.main.async { [weak self] in
             guard let self, let window = self.window else { return }
