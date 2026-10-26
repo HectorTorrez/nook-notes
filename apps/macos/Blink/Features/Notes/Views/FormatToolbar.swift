@@ -25,6 +25,10 @@ struct FormatToolbar: View {
                     controller.toggleCode()
                 }
 
+                FormatIconButton(systemImage: "eraser", help: "Clear Formatting") {
+                    controller.clearFormatting()
+                }
+
                 separator
 
                 FormatIconButton(

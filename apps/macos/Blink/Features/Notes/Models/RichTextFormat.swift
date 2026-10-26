@@ -50,6 +50,22 @@ enum HeadingLevel: Int, CaseIterable, Identifiable {
         case .heading3: (base * 1.18).rounded()
         }
     }
+
+    var paragraphSpacingBefore: CGFloat {
+        switch self {
+        case .heading1: 14
+        case .heading2: 12
+        case .heading3: 10
+        }
+    }
+
+    var paragraphSpacing: CGFloat {
+        switch self {
+        case .heading1: 8
+        case .heading2: 6
+        case .heading3: 4
+        }
+    }
 }
 
 /// The list styles offered in the list menu.
