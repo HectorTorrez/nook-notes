@@ -16,6 +16,7 @@ final class NotesStore {
     @ObservationIgnored private let storage: NotesFileStorage?
     @ObservationIgnored private var pendingSave: Task<Void, Never>?
     @ObservationIgnored private var terminationObserver: NSObjectProtocol?
+    @ObservationIgnored private var isTerminating = false
 
     private static let saveDelay: Duration = .milliseconds(500)
     private static let logger = Logger(subsystem: "com.hectortorrez.blink", category: "NotesStore")
@@ -49,7 +50,11 @@ final class NotesStore {
             terminationObserver = NotificationCenter.default.addObserver(
                 forName: NSApplication.willTerminateNotification, object: nil, queue: .main
             ) { [weak self] _ in
-                MainActor.assumeIsolated { self?.saveNow() }
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.isTerminating = true
+                    self.saveNow()
+                }
             }
             scheduleSave()
         }
@@ -154,14 +159,41 @@ final class NotesStore {
     }
 
     func updateSelectedContent(_ content: String, richTextData: Data?) {
-        guard selectedNote.content != content || selectedNote.richTextData != richTextData else { return }
-        updateActive { workspace in
-            guard let index = workspace.notes.firstIndex(where: { $0.id == workspace.selectedNoteID }) else { return }
-            workspace.notes[index].content = content
-            workspace.notes[index].richTextData = richTextData
-            workspace.notes[index].modifiedAt = now()
+        updateRichText(for: selectedID, content: content, richTextData: richTextData)
+    }
+
+    /// Updates just the plain text. Rich text is archived separately on a short
+    /// debounce so typing does not run a full archive on every keystroke.
+    func updateText(for noteID: Note.ID, content: String) {
+        guard let location = locate(noteID),
+              workspaces[location.workspace].notes[location.note].content != content else {
+            return
         }
+        workspaces[location.workspace].notes[location.note].content = content
+        workspaces[location.workspace].notes[location.note].modifiedAt = now()
         scheduleSave()
+    }
+
+    /// Writes the latest rich-text archive. The note is located by ID so a
+    /// delayed archive can never land on a note that became selected later.
+    func updateRichText(for noteID: Note.ID, content: String, richTextData: Data?) {
+        guard let location = locate(noteID) else { return }
+        var note = workspaces[location.workspace].notes[location.note]
+        guard note.content != content || note.richTextData != richTextData else { return }
+        note.content = content
+        note.richTextData = richTextData
+        note.modifiedAt = now()
+        workspaces[location.workspace].notes[location.note] = note
+        scheduleSave()
+    }
+
+    private func locate(_ noteID: Note.ID) -> (workspace: Int, note: Int)? {
+        for (workspaceIndex, workspace) in workspaces.enumerated() {
+            if let noteIndex = workspace.notes.firstIndex(where: { $0.id == noteID }) {
+                return (workspaceIndex, noteIndex)
+            }
+        }
+        return nil
     }
 
     func deleteNote(_ id: Note.ID) {
@@ -228,6 +260,10 @@ final class NotesStore {
 
     private func scheduleSave() {
         guard storage != nil else { return }
+        if isTerminating {
+            saveNow()
+            return
+        }
         pendingSave?.cancel()
         pendingSave = Task { [weak self] in
             try? await Task.sleep(for: Self.saveDelay)

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -75,6 +76,41 @@ struct NotesStoreTests {
 
         store.selectWorkspace(workWorkspaceID)
         #expect(store.selectedNote.content == "Work note")
+    }
+
+    @Test
+    func textUpdatesTargetTheNoteIDInsteadOfTheCurrentSelection() {
+        let store = NotesStore(now: { self.epoch })
+        store.updateSelectedContent("First", richTextData: nil)
+        let firstID = store.selectedID
+
+        store.createNote()
+        let secondID = store.selectedID
+
+        store.updateText(for: firstID, content: "Edited first")
+
+        #expect(store.selectedID == secondID)
+        #expect(store.notes.first(where: { $0.id == firstID })?.content == "Edited first")
+        #expect(store.notes.first(where: { $0.id == secondID })?.content == "")
+    }
+
+    @Test
+    func richTextUpdatesTargetTheNoteIDInsteadOfTheCurrentSelection() throws {
+        let store = NotesStore(now: { self.epoch })
+        store.updateSelectedContent("First", richTextData: nil)
+        let firstID = store.selectedID
+
+        store.createNote()
+        let secondID = store.selectedID
+
+        let archive = try #require(
+            RichTextCoding.data(from: NSAttributedString(string: "Archived"))
+        )
+        store.updateRichText(for: firstID, content: "Edited first", richTextData: archive)
+
+        #expect(store.selectedID == secondID)
+        #expect(store.notes.first(where: { $0.id == firstID })?.richTextData == archive)
+        #expect(store.notes.first(where: { $0.id == secondID })?.richTextData == nil)
     }
 
     @Test
