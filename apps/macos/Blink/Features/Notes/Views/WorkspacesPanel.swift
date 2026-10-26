@@ -9,6 +9,7 @@ struct WorkspacesPanel: View {
     @State private var pendingDeleteID: Workspace.ID?
     @FocusState private var isNameFocused: Bool
     @Environment(\.themeAccent) private var accent
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var workspaceCountLabel: String {
         store.workspaces.count == 1 ? "1 workspace" : "\(store.workspaces.count) workspaces"
@@ -139,7 +140,7 @@ struct WorkspacesPanel: View {
                 .strokeBorder(accent.opacity(isNameFocused ? 0.5 : 0), lineWidth: 1)
         }
         .padding(10)
-        .animation(.easeOut(duration: 0.15), value: isNameFocused)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: isNameFocused)
     }
 
     private func deleteTooltip(for workspace: Workspace) -> some View {

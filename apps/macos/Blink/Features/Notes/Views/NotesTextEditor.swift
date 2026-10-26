@@ -7,6 +7,7 @@ struct NotesTextEditor: NSViewRepresentable {
     var richTextData: Data?
     var fontSize: CGFloat
     var preferences: EditorPreferences
+    var accessibilityLabel: String
     var caretColor: Color
     var controller: RichTextController
     var onTextChange: (Note.ID, String) -> Void
@@ -74,7 +75,7 @@ struct NotesTextEditor: NSViewRepresentable {
             .underlineStyle: NSUnderlineStyle.single.rawValue,
             .cursor: NSCursor.pointingHand,
         ]
-        textView.setAccessibilityLabel("Note")
+        textView.setAccessibilityLabel(accessibilityLabel)
 
         textView.onCancel = { [weak coordinator = context.coordinator] in
             coordinator?.parent.onEscape() ?? false
@@ -108,6 +109,7 @@ struct NotesTextEditor: NSViewRepresentable {
         coordinator.parent = self
 
         textView.insertionPointColor = NSColor(caretColor)
+        textView.setAccessibilityLabel(accessibilityLabel)
         textView.baseFontSize = fontSize
         textView.fontFamily = preferences.fontFamily
         textView.richTextController = controller
