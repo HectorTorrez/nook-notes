@@ -82,7 +82,7 @@ struct NotesView: View {
                 .frame(height: titleBarHeight)
         }
         .ignoresSafeArea()
-        .frame(minWidth: 400, minHeight: 100)
+        .frame(minWidth: 400, minHeight: 200)
         .background {
             GlassWindowBackground(tintOpacity: backgroundOpacity)
                 .ignoresSafeArea()

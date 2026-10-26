@@ -10,6 +10,13 @@ struct FormatToolbar: View {
     let onDismiss: () -> Void
 
     var body: some View {
+        ViewThatFits(in: .horizontal) {
+            fullBar
+            compactBar
+        }
+    }
+
+    private var fullBar: some View {
         HStack(spacing: 8) {
             HStack(spacing: 0) {
                 HeadingMenuButton(controller: controller)
@@ -55,21 +62,57 @@ struct FormatToolbar: View {
             .padding(3)
             .formatGlass(in: Capsule())
 
-            Button {
-                onDismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 30, height: 30)
-                    .background(Circle().fill(Color.black))
-                    .contentShape(Circle())
-            }
-            .buttonStyle(PointerButtonStyle())
-            .help("Dismiss (esc)")
-            .accessibilityLabel("Dismiss formatting bar")
+            dismissButton
         }
         .fixedSize()
+    }
+
+    private var compactBar: some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 0) {
+                HeadingMenuButton(controller: controller)
+                TextStyleMenuButton(controller: controller)
+                LinkButton(controller: controller)
+
+                FormatIconButton(
+                    systemImage: "chevron.left.forwardslash.chevron.right",
+                    help: "Code",
+                    isActive: controller.isCode
+                ) {
+                    controller.toggleCode()
+                }
+
+                FormatOverflowMenu(controller: controller)
+
+                separator
+
+                AppearanceMenuButton(
+                    backgroundOpacity: $backgroundOpacity,
+                    fontSize: $fontSize
+                )
+            }
+            .padding(3)
+            .formatGlass(in: Capsule())
+
+            dismissButton
+        }
+        .fixedSize()
+    }
+
+    private var dismissButton: some View {
+        Button {
+            onDismiss()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(Circle().fill(Color.black))
+                .contentShape(Circle())
+        }
+        .buttonStyle(PointerButtonStyle())
+        .help("Dismiss (esc)")
+        .accessibilityLabel("Dismiss formatting bar")
     }
 
     private var separator: some View {
@@ -357,6 +400,80 @@ private struct LinkButton: View {
 }
 
 // MARK: - Building blocks
+
+/// Compact overflow for the controls that do not fit in a narrow window.
+private struct FormatOverflowMenu: View {
+    let controller: RichTextController
+
+    private static let alignments: [(title: String, value: NSTextAlignment, symbol: String)] = [
+        ("Left", .left, "text.alignleft"),
+        ("Center", .center, "text.aligncenter"),
+        ("Right", .right, "text.alignright"),
+        ("Justify", .justified, "text.justify"),
+    ]
+
+    var body: some View {
+        Menu {
+            Toggle(
+                "Block Quote",
+                isOn: Binding(
+                    get: { controller.isBlockquote },
+                    set: { _ in controller.toggleBlockquote() }
+                )
+            )
+
+            Menu("Alignment") {
+                ForEach(Self.alignments, id: \.title) { option in
+                    Toggle(
+                        option.title,
+                        isOn: Binding(
+                            get: { controller.alignment == option.value },
+                            set: { _ in controller.setAlignment(option.value) }
+                        )
+                    )
+                }
+            }
+
+            Menu("List") {
+                ForEach(ListStyle.allCases) { style in
+                    Toggle(
+                        style.title,
+                        isOn: Binding(
+                            get: { controller.listStyle == style },
+                            set: { _ in controller.setList(style) }
+                        )
+                    )
+                }
+            }
+
+            Toggle(
+                "Toggle Checklist",
+                isOn: Binding(
+                    get: { controller.isChecklist },
+                    set: { _ in controller.toggleChecklist() }
+                )
+            )
+            .disabled(!controller.isChecklist)
+
+            Divider()
+
+            Button("Clear Formatting", systemImage: "eraser") {
+                controller.clearFormatting()
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.primary)
+                .frame(width: 30, height: 26)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("More formatting")
+        .accessibilityLabel("More formatting")
+    }
+}
 
 private struct FormatMenuLabel<Glyph: View>: View {
     var width: CGFloat = 44
