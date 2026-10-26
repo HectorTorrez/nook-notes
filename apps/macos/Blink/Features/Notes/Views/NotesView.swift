@@ -335,6 +335,9 @@ struct NotesView: View {
         case .copyNote:
             note.copyToPasteboard()
             confirmCopy()
+        case .copyAsMarkdown:
+            note.copyMarkdownToPasteboard()
+            confirmCopy()
         case .deleteNote:
             store.deleteNote(note.id)
         case .restoreLastDeleted:
