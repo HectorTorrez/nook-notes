@@ -53,7 +53,6 @@ enum Theme {
     static let fieldCornerRadius: CGFloat = 9
     static let rowSpacing: CGFloat = 2
     static let listPadding: CGFloat = 6
-    static let controlHeight: CGFloat = 24
 }
 
 /// A small uppercase section label that sits above a list or form group.
