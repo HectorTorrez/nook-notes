@@ -20,9 +20,9 @@ enum HeadingLevel: Int, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .heading1: "Heading 1"
-        case .heading2: "Heading 2"
-        case .heading3: "Heading 3"
+        case .heading1: String(localized: "Heading 1")
+        case .heading2: String(localized: "Heading 2")
+        case .heading3: String(localized: "Heading 3")
         }
     }
 
@@ -78,9 +78,9 @@ enum ListStyle: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .ordered: "Ordered List"
-        case .bullet: "Bullet List"
-        case .task: "Task List"
+        case .ordered: String(localized: "Ordered List")
+        case .bullet: String(localized: "Bullet List")
+        case .task: String(localized: "Task List")
         }
     }
 

@@ -9,7 +9,6 @@ struct SearchPanel<Item: Identifiable, Row: View, Trailing: View>: View {
     let items: [Item]
     let rowHeight: CGFloat
     var listCaption: String? = nil
-    var listNoun: String? = nil
     var emptyIcon: String = "magnifyingglass"
     var footerHints: [PanelFooter.Hint] = PanelFooter.navigation
     let matches: (Item, String) -> Bool
@@ -41,11 +40,10 @@ struct SearchPanel<Item: Identifiable, Row: View, Trailing: View>: View {
     private var captionText: String? {
         guard let listCaption else { return nil }
         let trimmed = query.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty, filtered.count != items.count, let listNoun else {
+        guard !trimmed.isEmpty, filtered.count != items.count else {
             return listCaption
         }
-        let noun = filtered.count == 1 ? listNoun : "\(listNoun)s"
-        return "\(filtered.count) of \(items.count) \(noun)"
+        return "\(filtered.count) / \(items.count)"
     }
 
     var body: some View {
@@ -198,7 +196,6 @@ extension SearchPanel where Trailing == EmptyView {
         items: [Item],
         rowHeight: CGFloat,
         listCaption: String? = nil,
-        listNoun: String? = nil,
         emptyIcon: String = "magnifyingglass",
         footerHints: [PanelFooter.Hint] = PanelFooter.navigation,
         matches: @escaping (Item, String) -> Bool,
@@ -212,7 +209,6 @@ extension SearchPanel where Trailing == EmptyView {
             items: items,
             rowHeight: rowHeight,
             listCaption: listCaption,
-            listNoun: listNoun,
             emptyIcon: emptyIcon,
             footerHints: footerHints,
             matches: matches,

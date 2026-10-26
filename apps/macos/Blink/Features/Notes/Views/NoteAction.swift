@@ -16,15 +16,15 @@ enum NoteAction: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .newNote: "New Note"
-        case .duplicateNote: "Duplicate Note"
-        case .switchWorkspace: "Workspaces"
-        case .browseNotes: "Browse Notes"
-        case .copyNote: "Copy Note"
-        case .copyAsMarkdown: "Copy as Markdown"
-        case .deleteNote: "Delete Note"
-        case .restoreLastDeleted: "Restore Last Deleted"
-        case .trash: "Trash"
+        case .newNote: String(localized: "New Note")
+        case .duplicateNote: String(localized: "Duplicate Note")
+        case .switchWorkspace: String(localized: "Workspaces")
+        case .browseNotes: String(localized: "Browse Notes")
+        case .copyNote: String(localized: "Copy Note")
+        case .copyAsMarkdown: String(localized: "Copy as Markdown")
+        case .deleteNote: String(localized: "Delete Note")
+        case .restoreLastDeleted: String(localized: "Restore Last Deleted")
+        case .trash: String(localized: "Trash")
         }
     }
 

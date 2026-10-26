@@ -12,7 +12,7 @@ struct TrashPanel: View {
     }
 
     private var countLabel: String {
-        store.trashCount == 1 ? "1 deleted note" : "\(store.trashCount) deleted notes"
+        LocalizedCount.deletedNotes(store.trashCount)
     }
 
     var body: some View {
@@ -23,7 +23,6 @@ struct TrashPanel: View {
                 items: entries,
                 rowHeight: 54,
                 listCaption: countLabel,
-                listNoun: "deleted note",
                 emptyIcon: "trash",
                 matches: { entry, query in
                     entry.note.content.localizedCaseInsensitiveContains(query)

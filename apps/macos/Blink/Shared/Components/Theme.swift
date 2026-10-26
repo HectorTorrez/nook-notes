@@ -16,15 +16,15 @@ enum AccentPalette: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .graphite: "Graphite"
-        case .blue: "Blue"
-        case .indigo: "Indigo"
-        case .purple: "Purple"
-        case .pink: "Pink"
-        case .red: "Red"
-        case .orange: "Orange"
-        case .green: "Green"
-        case .teal: "Teal"
+        case .graphite: String(localized: "Graphite")
+        case .blue: String(localized: "Blue")
+        case .indigo: String(localized: "Indigo")
+        case .purple: String(localized: "Purple")
+        case .pink: String(localized: "Pink")
+        case .red: String(localized: "Red")
+        case .orange: String(localized: "Orange")
+        case .green: String(localized: "Green")
+        case .teal: String(localized: "Teal")
         }
     }
 

@@ -11,10 +11,10 @@ enum EditorFontFamily: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .system: "System"
-        case .serif: "Serif"
-        case .rounded: "Rounded"
-        case .monospaced: "Monospaced"
+        case .system: String(localized: "System")
+        case .serif: String(localized: "Serif")
+        case .rounded: String(localized: "Rounded")
+        case .monospaced: String(localized: "Monospaced")
         }
     }
 

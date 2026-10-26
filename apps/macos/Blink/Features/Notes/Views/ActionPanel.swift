@@ -49,8 +49,8 @@ struct ActionPanel: View {
         switch action {
         case .restoreLastDeleted: store.lastDeleted?.title
         case .switchWorkspace: store.activeWorkspace.name
-        case .browseNotes: store.notes.count == 1 ? "1 note" : "\(store.notes.count) notes"
-        case .trash: store.trashCount == 1 ? "1 note" : "\(store.trashCount) notes"
+        case .browseNotes: LocalizedCount.notes(store.notes.count)
+        case .trash: LocalizedCount.deletedNotes(store.trashCount)
         default: nil
         }
     }

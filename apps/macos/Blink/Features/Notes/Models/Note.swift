@@ -34,7 +34,7 @@ struct Note: Identifiable, Equatable, Sendable, Codable {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if !trimmed.isEmpty { return trimmed }
         }
-        return "Untitled"
+        return String(localized: "Untitled")
     }
 
     var isEmpty: Bool {

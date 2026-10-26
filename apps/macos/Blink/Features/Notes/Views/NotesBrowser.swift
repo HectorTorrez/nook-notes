@@ -56,13 +56,10 @@ struct NotesBrowser: View {
     private var caption: String {
         switch scope {
         case .workspace:
-            return store.notes.count == 1 ? "1 note" : "\(store.notes.count) notes"
+            return LocalizedCount.notes(store.notes.count)
         case .all:
-            let notes = results.count == 1 ? "1 note" : "\(results.count) notes"
-            let workspaces = store.workspaces.count == 1
-                ? "1 workspace"
-                : "\(store.workspaces.count) workspaces"
-            return "\(notes) in \(workspaces)"
+            return "\(LocalizedCount.notes(results.count)) · "
+                + LocalizedCount.workspaces(store.workspaces.count)
         }
     }
 
@@ -85,7 +82,6 @@ struct NotesBrowser: View {
                 items: results,
                 rowHeight: 54,
                 listCaption: caption,
-                listNoun: "note",
                 emptyIcon: "note.text",
                 matches: { result, query in
                     result.note.content.localizedCaseInsensitiveContains(query)
@@ -193,40 +189,22 @@ struct NotesBrowser: View {
     }
 
     private func characterLabel(for note: Note) -> String {
-        note.characterCount == 1 ? "1 character" : "\(note.characterCount) characters"
+        LocalizedCount.characters(note.characterCount)
     }
 }
 
-/// Coarse labels such as today, yesterday, and one week ago.
+/// Coarse, localized labels such as “today”, “yesterday”, and “2 days ago”.
+@MainActor
 private enum OpenedWhen {
     static func label(for date: Date, now: Date) -> String {
-        let calendar = Calendar.current
-        let days = calendar.dateComponents(
-            [.day],
-            from: calendar.startOfDay(for: date),
-            to: calendar.startOfDay(for: now)
-        ).day ?? 0
-
-        if days <= 0 { return "today" }
-        if days == 1 { return "yesterday" }
-        if days < 7 { return "\(spell(days)) days ago" }
-        if days < 30 {
-            let weeks = max(1, days / 7)
-            return weeks == 1 ? "one week ago" : "\(spell(weeks)) weeks ago"
-        }
-        if days < 365 {
-            let months = max(1, days / 30)
-            return months == 1 ? "one month ago" : "\(spell(months)) months ago"
-        }
-        let years = max(1, days / 365)
-        return years == 1 ? "one year ago" : "\(spell(years)) years ago"
+        formatter.localizedString(for: date, relativeTo: now)
     }
 
-    private static func spell(_ value: Int) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .spellOut
-        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
-    }
+    private static let formatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter
+    }()
 }
 
 struct RowActionButton: View {

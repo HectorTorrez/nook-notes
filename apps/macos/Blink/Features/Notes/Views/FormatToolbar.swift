@@ -183,7 +183,7 @@ private struct TextStyleMenuButton: View {
                     controller.toggleBold()
                     shown = false
                 } label: {
-                    FormatMenuRow(title: "Bold", keys: ["⌘", "B"], isActive: controller.isBold) {
+                    FormatMenuRow(title: String(localized: "Bold"), keys: ["⌘", "B"], isActive: controller.isBold) {
                         Text("B").font(.system(size: 13, weight: .bold, design: .serif))
                     }
                 }
@@ -193,7 +193,7 @@ private struct TextStyleMenuButton: View {
                     controller.toggleItalic()
                     shown = false
                 } label: {
-                    FormatMenuRow(title: "Italic", keys: ["⌘", "I"], isActive: controller.isItalic) {
+                    FormatMenuRow(title: String(localized: "Italic"), keys: ["⌘", "I"], isActive: controller.isItalic) {
                         Text("I").font(.system(size: 13, weight: .medium, design: .serif)).italic()
                     }
                 }
@@ -204,7 +204,7 @@ private struct TextStyleMenuButton: View {
                     shown = false
                 } label: {
                     FormatMenuRow(
-                        title: "Strikethrough",
+                        title: String(localized: "Strikethrough"),
                         keys: ["⇧", "⌘", "S"],
                         isActive: controller.isStruckThrough
                     ) {
@@ -217,7 +217,7 @@ private struct TextStyleMenuButton: View {
                     controller.toggleUnderline()
                     shown = false
                 } label: {
-                    FormatMenuRow(title: "Underline", keys: ["⌘", "U"], isActive: controller.isUnderlined) {
+                    FormatMenuRow(title: String(localized: "Underline"), keys: ["⌘", "U"], isActive: controller.isUnderlined) {
                         Text("U").font(.system(size: 13, weight: .medium, design: .serif)).underline()
                     }
                 }
@@ -275,10 +275,10 @@ private struct AlignmentMenuButton: View {
     @State private var shown = false
 
     private static let options: [(title: String, value: NSTextAlignment, symbol: String)] = [
-        ("Left", .left, "text.alignleft"),
-        ("Center", .center, "text.aligncenter"),
-        ("Right", .right, "text.alignright"),
-        ("Justify", .justified, "text.justify"),
+        (String(localized: "Left"), .left, "text.alignleft"),
+        (String(localized: "Center"), .center, "text.aligncenter"),
+        (String(localized: "Right"), .right, "text.alignright"),
+        (String(localized: "Justify"), .justified, "text.justify"),
     ]
 
     private var symbol: String {
@@ -406,10 +406,10 @@ private struct FormatOverflowMenu: View {
     let controller: RichTextController
 
     private static let alignments: [(title: String, value: NSTextAlignment, symbol: String)] = [
-        ("Left", .left, "text.alignleft"),
-        ("Center", .center, "text.aligncenter"),
-        ("Right", .right, "text.alignright"),
-        ("Justify", .justified, "text.justify"),
+        (String(localized: "Left"), .left, "text.alignleft"),
+        (String(localized: "Center"), .center, "text.aligncenter"),
+        (String(localized: "Right"), .right, "text.alignright"),
+        (String(localized: "Justify"), .justified, "text.justify"),
     ]
 
     var body: some View {

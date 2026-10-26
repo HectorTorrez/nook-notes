@@ -12,7 +12,7 @@ struct WorkspacesPanel: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var workspaceCountLabel: String {
-        store.workspaces.count == 1 ? "1 workspace" : "\(store.workspaces.count) workspaces"
+        LocalizedCount.workspaces(store.workspaces.count)
     }
 
     private var isRenaming: Bool { renamingID != nil }
@@ -25,7 +25,6 @@ struct WorkspacesPanel: View {
                 items: store.workspacesByRecency,
                 rowHeight: 50,
                 listCaption: workspaceCountLabel,
-                listNoun: "workspace",
                 emptyIcon: "square.stack.3d.up",
                 matches: { workspace, query in
                     workspace.name.localizedCaseInsensitiveContains(query)
