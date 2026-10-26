@@ -109,6 +109,29 @@ final class NotesStore {
         workspaces.sorted { $0.createdAt > $1.createdAt }
     }
 
+    /// Every note in every workspace, pinned-first and then most recently edited.
+    var allNotesByRecency: [WorkspaceNote] {
+        workspaces
+            .flatMap { workspace in
+                workspace.notes.map {
+                    WorkspaceNote(
+                        workspaceID: workspace.id,
+                        workspaceName: workspace.name,
+                        note: $0
+                    )
+                }
+            }
+            .sorted { lhs, rhs in
+                if lhs.note.isPinned != rhs.note.isPinned {
+                    return lhs.note.isPinned && !rhs.note.isPinned
+                }
+                if lhs.note.modifiedAt != rhs.note.modifiedAt {
+                    return lhs.note.modifiedAt > rhs.note.modifiedAt
+                }
+                return lhs.note.createdAt > rhs.note.createdAt
+            }
+    }
+
     var canDeleteWorkspace: Bool { workspaces.count > 1 }
 
     var lastDeleted: Note? {
@@ -228,11 +251,8 @@ final class NotesStore {
     }
 
     func togglePin(_ id: Note.ID) {
-        guard notes.contains(where: { $0.id == id }) else { return }
-        updateActive { workspace in
-            guard let index = workspace.notes.firstIndex(where: { $0.id == id }) else { return }
-            workspace.notes[index].isPinned.toggle()
-        }
+        guard let location = locate(id) else { return }
+        workspaces[location.workspace].notes[location.note].isPinned.toggle()
         scheduleSave()
     }
 
@@ -362,29 +382,30 @@ final class NotesStore {
     }
 
     func deleteNote(_ id: Note.ID) {
-        guard notes.contains(where: { $0.id == id }) else { return }
-        let deletedSelection = selectedID == id
-        let workspaceID = activeWorkspace.id
-        let workspaceName = activeWorkspace.name
+        guard let location = locate(id) else { return }
+        let workspace = workspaces[location.workspace]
+        let deletedSelection = location.workspace == activeIndex
+            && workspace.selectedNoteID == id
 
-        updateActive { workspace in
-            guard let index = workspace.notes.firstIndex(where: { $0.id == id }) else { return }
-            let removed = workspace.notes.remove(at: index)
-            if !removed.isEmpty {
-                self.trash.append(TrashedNote(
-                    note: removed,
-                    workspaceID: workspaceID,
-                    workspaceName: workspaceName,
-                    deletedAt: self.now()
-                ))
-            }
-            if workspace.notes.isEmpty {
-                workspace.notes.append(Note(createdAt: self.now()))
-            }
-            if workspace.selectedNoteID == id {
-                workspace.selectedNoteID = Self.sortedNotes(workspace.notes)[0].id
-            }
+        let removed = workspaces[location.workspace].notes.remove(at: location.note)
+        if !removed.isEmpty {
+            trash.append(TrashedNote(
+                note: removed,
+                workspaceID: workspace.id,
+                workspaceName: workspace.name,
+                deletedAt: now()
+            ))
         }
+
+        if workspaces[location.workspace].notes.isEmpty {
+            let replacement = Note(createdAt: now())
+            workspaces[location.workspace].notes.append(replacement)
+            workspaces[location.workspace].selectedNoteID = replacement.id
+        } else if workspaces[location.workspace].selectedNoteID == id {
+            workspaces[location.workspace].selectedNoteID =
+                Self.sortedNotes(workspaces[location.workspace].notes)[0].id
+        }
+
         if deletedSelection {
             markOpened(selectedID)
         }
