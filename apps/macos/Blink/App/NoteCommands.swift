@@ -4,10 +4,24 @@ struct NoteCommands: Commands {
     let store: NotesStore
     @FocusedValue(\.notesCommandHandler) private var handler
     @FocusedValue(\.richTextController) private var format
+    @AppStorage("fontSize") private var fontSize: Double = 16
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
             button(for: .newNote)
+        }
+
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            Button("Find…") { format?.showFindPanel() }
+                .keyboardShortcut("f")
+                .disabled(format == nil)
+            Button("Find Next") { format?.findNext() }
+                .keyboardShortcut("g")
+                .disabled(format == nil)
+            Button("Find Previous") { format?.findPrevious() }
+                .keyboardShortcut("g", modifiers: [.command, .shift])
+                .disabled(format == nil)
         }
 
         CommandMenu("Note") {
@@ -60,6 +74,21 @@ struct NoteCommands: Commands {
                 .keyboardShortcut(style.shortcut)
                 .disabled(format == nil)
         }
+
+        Divider()
+
+        Button("Increase Text Size") {
+            fontSize = min(28, fontSize + 1)
+        }
+        .keyboardShortcut("=")
+        Button("Decrease Text Size") {
+            fontSize = max(12, fontSize - 1)
+        }
+        .keyboardShortcut("-")
+        Button("Actual Size") {
+            fontSize = 16
+        }
+        .keyboardShortcut("0")
     }
 
     private func button(for action: NoteAction) -> some View {

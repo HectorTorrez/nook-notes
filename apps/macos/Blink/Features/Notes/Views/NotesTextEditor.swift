@@ -60,6 +60,8 @@ struct NotesTextEditor: NSViewRepresentable {
         textView.isRichText = true
         textView.importsGraphics = false
         textView.allowsUndo = true
+        textView.usesFindBar = true
+        textView.isIncrementalSearchingEnabled = true
         textView.drawsBackground = false
         textView.focusRingType = .none
         textView.textContainerInset = NSSize(width: Self.horizontalInset, height: Self.topInset)
