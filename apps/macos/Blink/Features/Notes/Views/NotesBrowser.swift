@@ -6,110 +6,190 @@ struct NotesBrowser: View {
     let listedAt: Date
     let onSelect: (Note.ID) -> Void
 
+    @State private var scope: Scope = .workspace
     @Environment(\.themeAccent) private var accent
 
-    private var noteCountLabel: String {
-        store.notes.count == 1 ? "1 note" : "\(store.notes.count) notes"
+    private enum Scope: String, CaseIterable, Identifiable, Hashable {
+        case workspace
+        case all
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .workspace: "Workspace"
+            case .all: "All Notes"
+            }
+        }
+    }
+
+    private struct NoteResult: Identifiable {
+        let workspaceID: Workspace.ID
+        let workspaceName: String
+        let note: Note
+
+        var id: Note.ID { note.id }
+    }
+
+    private var results: [NoteResult] {
+        switch scope {
+        case .workspace:
+            let workspace = store.activeWorkspace
+            return store.notesByRecency.map {
+                NoteResult(
+                    workspaceID: workspace.id,
+                    workspaceName: workspace.name,
+                    note: $0
+                )
+            }
+        case .all:
+            return store.allNotesByRecency.map {
+                NoteResult(
+                    workspaceID: $0.workspaceID,
+                    workspaceName: $0.workspaceName,
+                    note: $0.note
+                )
+            }
+        }
+    }
+
+    private var caption: String {
+        switch scope {
+        case .workspace:
+            return store.notes.count == 1 ? "1 note" : "\(store.notes.count) notes"
+        case .all:
+            let notes = results.count == 1 ? "1 note" : "\(results.count) notes"
+            let workspaces = store.workspaces.count == 1
+                ? "1 workspace"
+                : "\(store.workspaces.count) workspaces"
+            return "\(notes) in \(workspaces)"
+        }
     }
 
     var body: some View {
-        SearchPanel(
-            placeholder: "Search notes",
-            emptyMessage: "No matching notes",
-            items: store.notesByRecency,
-            rowHeight: 50,
-            listCaption: noteCountLabel,
-            listNoun: "note",
-            emptyIcon: "note.text",
-            matches: { note, query in
-                note.content.localizedCaseInsensitiveContains(query)
-            },
-            onSelect: { onSelect($0.id) },
-            row: { note in
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 5) {
-                        if note.isPinned {
-                            Image(systemName: "pin.fill")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(.orange)
-                                .accessibilityHidden(true)
-                        }
-                        Text(note.title)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(note.isEmpty ? .secondary : .primary)
-                            .lineLimit(1)
+        VStack(spacing: 0) {
+            Picker("Search Scope", selection: $scope) {
+                ForEach(Scope.allCases) { scope in
+                    Text(scope.title).tag(scope)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 10)
+            .padding(.top, 10)
+            .accessibilityLabel("Search scope")
+
+            SearchPanel(
+                placeholder: scope == .workspace ? "Search notes" : "Search all notes",
+                emptyMessage: "No matching notes",
+                items: results,
+                rowHeight: 54,
+                listCaption: caption,
+                listNoun: "note",
+                emptyIcon: "note.text",
+                matches: { result, query in
+                    result.note.content.localizedCaseInsensitiveContains(query)
+                },
+                onSelect: { result in
+                    if result.workspaceID != store.selectedWorkspaceID {
+                        store.selectWorkspace(result.workspaceID)
                     }
-                    HStack(spacing: 5) {
-                        if note.id == store.selectedID {
-                            Text("Current")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(accent)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1)
-                                .background {
-                                    Capsule(style: .continuous)
-                                        .fill(accent.opacity(0.16))
-                                }
-                        } else {
-                            Text(OpenedWhen.label(for: note.modifiedAt, now: listedAt))
+                    onSelect(result.note.id)
+                },
+                row: { result in
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 5) {
+                            if result.note.isPinned {
+                                Image(systemName: "pin.fill")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(.orange)
+                                    .accessibilityHidden(true)
+                            }
+                            Text(result.note.title)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(result.note.isEmpty ? .secondary : .primary)
+                                .lineLimit(1)
+                        }
+                        HStack(spacing: 5) {
+                            if scope == .all {
+                                Text(result.workspaceName)
+                                    .foregroundStyle(accent)
+                                Text("·")
+                                    .foregroundStyle(.tertiary)
+                            }
+
+                            if result.workspaceID == store.selectedWorkspaceID,
+                               result.note.id == store.selectedID {
+                                Text("Current")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(accent)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 1)
+                                    .background {
+                                        Capsule(style: .continuous)
+                                            .fill(accent.opacity(0.16))
+                                    }
+                            } else {
+                                Text(OpenedWhen.label(for: result.note.modifiedAt, now: listedAt))
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text("·")
+                                .foregroundStyle(.tertiary)
+                            Text(characterLabel(for: result.note))
                                 .foregroundStyle(.secondary)
                         }
-                        Text("·")
-                            .foregroundStyle(.tertiary)
-                        Text(characterLabel(for: note))
-                            .foregroundStyle(.secondary)
+                        .font(.system(size: 11))
+                        .lineLimit(1)
                     }
-                    .font(.system(size: 11))
-                    .lineLimit(1)
-                }
-                .padding(.trailing, 52)
-                .contextMenu {
-                    Button(note.isPinned ? "Unpin" : "Pin") {
-                        store.togglePin(note.id)
-                    }
-                    Button("Duplicate") {
-                        store.duplicateNote(note.id)
-                    }
-                    if store.workspaces.count > 1 {
-                        Menu("Move to Workspace") {
-                            ForEach(
-                                store.workspaces.filter {
-                                    $0.id != store.selectedWorkspaceID
-                                }
-                            ) { workspace in
-                                Button(workspace.name) {
-                                    store.moveNote(note.id, to: workspace.id)
+                    .padding(.trailing, 52)
+                    .contextMenu {
+                        Button(result.note.isPinned ? "Unpin" : "Pin") {
+                            store.togglePin(result.note.id)
+                        }
+                        Button("Duplicate") {
+                            store.duplicateNote(result.note.id)
+                        }
+                        if store.workspaces.count > 1 {
+                            Menu("Move to Workspace") {
+                                ForEach(
+                                    store.workspaces.filter {
+                                        $0.id != result.workspaceID
+                                    }
+                                ) { workspace in
+                                    Button(workspace.name) {
+                                        store.moveNote(result.note.id, to: workspace.id)
+                                    }
                                 }
                             }
                         }
+                        Divider()
+                        Button("Delete", role: .destructive) {
+                            store.deleteNote(result.note.id)
+                        }
                     }
-                    Divider()
-                    Button("Delete", role: .destructive) {
-                        store.deleteNote(note.id)
+                },
+                trailing: { result in
+                    HStack(spacing: 0) {
+                        RowActionButton(
+                            systemImage: result.note.isPinned ? "pin.fill" : "pin",
+                            help: result.note.isPinned ? "Unpin" : "Pin",
+                            tint: result.note.isPinned ? .orange : .secondary
+                        ) {
+                            store.togglePin(result.note.id)
+                        }
+                        RowActionButton(
+                            systemImage: "trash",
+                            help: "Delete",
+                            tint: .secondary,
+                            isDestructive: true
+                        ) {
+                            store.deleteNote(result.note.id)
+                        }
                     }
                 }
-            },
-            trailing: { note in
-                HStack(spacing: 0) {
-                    RowActionButton(
-                        systemImage: note.isPinned ? "pin.fill" : "pin",
-                        help: note.isPinned ? "Unpin" : "Pin",
-                        tint: note.isPinned ? .orange : .secondary
-                    ) {
-                        store.togglePin(note.id)
-                    }
-                    RowActionButton(
-                        systemImage: "trash",
-                        help: "Delete",
-                        tint: .secondary,
-                        isDestructive: true
-                    ) {
-                        store.deleteNote(note.id)
-                    }
-                }
-            }
-        )
-        .frame(width: 360)
+            )
+        }
+        .frame(width: 380)
     }
 
     private func characterLabel(for note: Note) -> String {

@@ -170,6 +170,47 @@ struct NotesStoreTests {
     }
 
     @Test
+    func allNotesIncludeEveryWorkspaceAndSortLikeTheBrowser() {
+        var clock = epoch
+        let store = NotesStore(now: { clock })
+        store.updateSelectedContent("Personal note", richTextData: nil)
+
+        clock = epoch.addingTimeInterval(1)
+        #expect(store.createWorkspace(named: "Work"))
+        store.updateSelectedContent("Work note", richTextData: nil)
+
+        let all = store.allNotesByRecency
+        #expect(all.count == 2)
+        #expect(all.first?.note.content == "Work note")
+        #expect(all.map(\.workspaceName) == ["Work", "Personal"])
+    }
+
+    @Test
+    func pinAndDeleteWorkForNotesInOtherWorkspaces() throws {
+        let store = NotesStore(now: { self.epoch })
+        let personalID = store.selectedWorkspaceID
+
+        #expect(store.createWorkspace(named: "Work"))
+        let workID = store.selectedWorkspaceID
+        store.updateSelectedContent("Work note", richTextData: nil)
+        let workNoteID = store.selectedID
+
+        store.selectWorkspace(personalID)
+        store.togglePin(workNoteID)
+        #expect(
+            store.workspaces.first(where: { $0.id == workID })?
+                .notes.first(where: { $0.id == workNoteID })?.isPinned == true
+        )
+
+        store.deleteNote(workNoteID)
+        #expect(store.trash.last?.workspaceName == "Work")
+        #expect(
+            store.workspaces.first(where: { $0.id == workID })?
+                .notes.contains(where: { $0.id == workNoteID }) == false
+        )
+    }
+
+    @Test
     func duplicateWorkspaceNamesGetASuffix() {
         let store = NotesStore(now: { self.epoch })
 
