@@ -1,5 +1,6 @@
 import AppKit
 
+@MainActor
 enum AccessibilityAnnouncement {
     static func post(_ message: String) {
         guard let element = NSApp.mainWindow ?? NSApp.keyWindow else { return }
