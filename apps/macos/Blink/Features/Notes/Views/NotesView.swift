@@ -71,7 +71,12 @@ struct NotesView: View {
                 preferences: editorPreferences,
                 caretColor: accent,
                 controller: formatController,
-                onChange: { store.updateSelectedContent($0, richTextData: $1) },
+                onTextChange: { noteID, text in
+                    store.updateText(for: noteID, content: text)
+                },
+                onRichTextChange: { noteID, text, data in
+                    store.updateRichText(for: noteID, content: text, richTextData: data)
+                },
                 onEscape: dismissFormatBarIfNeeded
             )
             .overlay(alignment: .topLeading) { placeholder }

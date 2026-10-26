@@ -9,7 +9,8 @@ struct NotesTextEditor: NSViewRepresentable {
     var preferences: EditorPreferences
     var caretColor: Color
     var controller: RichTextController
-    var onChange: (String, Data?) -> Void
+    var onTextChange: (Note.ID, String) -> Void
+    var onRichTextChange: (Note.ID, String, Data?) -> Void
     /// Handles Escape while the editor is focused. Return `true` to consume the
     /// key, or `false` to let the text view's default behavior run.
     var onEscape: () -> Bool
@@ -82,6 +83,7 @@ struct NotesTextEditor: NSViewRepresentable {
         textView.baseFontSize = fontSize
         textView.fontFamily = preferences.fontFamily
         textView.richTextController = controller
+        context.coordinator.textView = textView
         applyPreferences(to: textView)
         context.coordinator.noteID = noteID
         context.coordinator.appliedFontSize = fontSize
@@ -114,6 +116,7 @@ struct NotesTextEditor: NSViewRepresentable {
         controller.fontFamily = preferences.fontFamily
 
         if coordinator.noteID != noteID {
+            coordinator.flushArchiveNow(deferringStoreUpdate: true)
             coordinator.noteID = noteID
             coordinator.appliedFontSize = fontSize
             coordinator.appliedFontFamily = preferences.fontFamily
@@ -142,21 +145,92 @@ struct NotesTextEditor: NSViewRepresentable {
         textView.isAutomaticLinkDetectionEnabled = preferences.detectsLinks
     }
 
+    static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
+        coordinator.flushArchiveNow()
+    }
+
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: NotesTextEditor
         var noteID: Note.ID?
         var appliedFontSize: CGFloat = 0
         var appliedFontFamily: EditorFontFamily = .system
+        weak var textView: NSTextView?
+
+        private var archiveTask: Task<Void, Never>?
+        nonisolated(unsafe) private var terminationObserver: NSObjectProtocol?
 
         init(_ parent: NotesTextEditor) {
             self.parent = parent
+            super.init()
+
+            terminationObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.willTerminateNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.flushArchiveNow()
+                }
+            }
+        }
+
+        deinit {
+            archiveTask?.cancel()
+            if let terminationObserver {
+                NotificationCenter.default.removeObserver(terminationObserver)
+            }
         }
 
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             parent.controller.refresh()
-            parent.onChange(textView.string, RichTextCoding.data(from: textView.attributedString()))
+            if let noteID {
+                parent.onTextChange(noteID, textView.string)
+            }
+            scheduleArchive(from: textView)
+        }
+
+        /// Rich text is archived after a short pause instead of on every
+        /// keystroke. The plain text is still saved immediately.
+        private func scheduleArchive(from textView: NSTextView) {
+            archiveTask?.cancel()
+            archiveTask = Task { [weak self, weak textView] in
+                try? await Task.sleep(for: .milliseconds(200))
+                guard !Task.isCancelled, let self, let textView else { return }
+                self.archiveNow(textView)
+            }
+        }
+
+        private func archiveNow(_ textView: NSTextView) {
+            archiveTask?.cancel()
+            archiveTask = nil
+            guard let noteID,
+                  let data = RichTextCoding.data(from: textView.attributedString()) else {
+                return
+            }
+            parent.onRichTextChange(noteID, textView.string, data)
+        }
+
+        func flushArchiveNow(deferringStoreUpdate: Bool = false) {
+            guard let textView, let noteID,
+                  let data = RichTextCoding.data(from: textView.attributedString()) else {
+                return
+            }
+
+            archiveTask?.cancel()
+            archiveTask = nil
+
+            let content = textView.string
+            if deferringStoreUpdate {
+                DispatchQueue.main.async { [weak self] in
+                    MainActor.assumeIsolated {
+                        self?.parent.onRichTextChange(noteID, content, data)
+                    }
+                }
+            } else {
+                parent.onRichTextChange(noteID, content, data)
+            }
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
