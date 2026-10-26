@@ -95,6 +95,93 @@ struct NotesStoreTests {
     }
 
     @Test
+    func recentlyEditedNotesMoveToTheTop() {
+        var clock = epoch
+        let store = NotesStore(now: { clock })
+
+        store.updateSelectedContent("First", richTextData: nil)
+        let firstID = store.selectedID
+
+        clock = epoch.addingTimeInterval(1)
+        store.createNote()
+        store.updateSelectedContent("Second", richTextData: nil)
+        #expect(store.notesByRecency.first?.content == "Second")
+
+        clock = epoch.addingTimeInterval(2)
+        store.select(firstID)
+        store.updateSelectedContent("First edited", richTextData: nil)
+
+        #expect(store.notesByRecency.first?.content == "First edited")
+    }
+
+    @Test
+    func duplicateNoteCopiesContentAndSelectsTheCopy() throws {
+        let store = NotesStore(now: { self.epoch })
+        store.updateSelectedContent("Copy me", richTextData: nil)
+
+        let copyID = try #require(store.duplicateSelectedNote())
+
+        #expect(store.notes.count == 2)
+        #expect(store.selectedID == copyID)
+        #expect(store.selectedNote.content == "Copy me")
+    }
+
+    @Test
+    func movingTheSelectedNoteKeepsBothWorkspacesValid() throws {
+        let store = NotesStore(now: { self.epoch })
+        let personalID = store.selectedWorkspaceID
+        #expect(store.createWorkspace(named: "Work"))
+        let workID = store.selectedWorkspaceID
+        store.updateSelectedContent("Move me", richTextData: nil)
+        let movedID = store.selectedID
+
+        #expect(store.moveNote(movedID, to: personalID))
+
+        #expect(store.selectedWorkspaceID == workID)
+        #expect(store.selectedNote.content == "")
+        #expect(store.workspaces.first(where: { $0.id == workID })?.notes.count == 1)
+        #expect(
+            store.workspaces.first(where: { $0.id == personalID })?
+                .notes.contains(where: { $0.id == movedID }) == true
+        )
+    }
+
+    @Test
+    func nextAndPreviousCycleThroughNotes() {
+        var clock = epoch
+        let store = NotesStore(now: { clock })
+        store.updateSelectedContent("A", richTextData: nil)
+        clock = epoch.addingTimeInterval(1)
+        store.createNote()
+        store.updateSelectedContent("B", richTextData: nil)
+
+        let ordered = store.notesByRecency
+        #expect(ordered.count == 2)
+        #expect(store.selectedID == ordered[0].id)
+
+        store.selectNextNote()
+        #expect(store.selectedID == ordered[1].id)
+
+        store.selectNextNote()
+        #expect(store.selectedID == ordered[0].id)
+
+        store.selectPreviousNote()
+        #expect(store.selectedID == ordered[1].id)
+    }
+
+    @Test
+    func duplicateWorkspaceNamesGetASuffix() {
+        let store = NotesStore(now: { self.epoch })
+
+        #expect(store.createWorkspace(named: "Work"))
+        #expect(store.createWorkspace(named: "Work"))
+
+        let names = store.workspaces.map(\.name)
+        #expect(names.contains("Work"))
+        #expect(names.contains("Work 2"))
+    }
+
+    @Test
     func storeReportsUnreadableFilesAndBlocksSaving() throws {
         let directory = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

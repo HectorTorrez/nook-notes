@@ -45,10 +45,44 @@ struct NoteCommands: Commands {
             Button("Show Actions") { handler?.showActions() }
                 .keyboardShortcut("k")
                 .disabled(handler == nil)
+
+            button(for: .duplicateNote)
+                .disabled(store.selectedNote.isEmpty)
+            Button(store.selectedNote.isPinned ? "Unpin Note" : "Pin Note") {
+                store.togglePin(store.selectedID)
+            }
+            .keyboardShortcut("p", modifiers: [.command, .option])
+
+            if store.workspaces.count > 1 {
+                Menu("Move to Workspace") {
+                    ForEach(
+                        store.workspaces.filter { $0.id != store.selectedWorkspaceID }
+                    ) { workspace in
+                        Button(workspace.name) {
+                            store.moveNote(store.selectedID, to: workspace.id)
+                        }
+                    }
+                }
+            }
+
+            Divider()
+
+            Button("Next Note") { store.selectNextNote() }
+                .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+                .disabled(store.notes.count < 2)
+            Button("Previous Note") { store.selectPreviousNote() }
+                .keyboardShortcut(.upArrow, modifiers: [.command, .option])
+                .disabled(store.notes.count < 2)
+
+            Divider()
+
             button(for: .switchWorkspace)
             button(for: .browseNotes)
             Divider()
             button(for: .copyNote)
+                .disabled(store.selectedNote.isEmpty)
+            button(for: .copyAsMarkdown)
+                .disabled(store.selectedNote.isEmpty)
             button(for: .deleteNote)
             button(for: .restoreLastDeleted)
                 .disabled(handler == nil || store.lastDeleted == nil)

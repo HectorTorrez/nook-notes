@@ -99,7 +99,7 @@ final class NotesStore {
         notes.first { $0.id == selectedID } ?? notes[0]
     }
 
-    /// Pinned notes first, then newest created first so oldest sit last.
+    /// Pinned notes first, then most recently edited first.
     var notesByRecency: [Note] {
         Self.sortedNotes(notes)
     }
@@ -164,7 +164,7 @@ final class NotesStore {
         guard !trimmed.isEmpty else { return false }
         let note = Note(createdAt: now())
         let workspace = Workspace(
-            name: trimmed,
+            name: uniqueWorkspaceName(trimmed),
             notes: [note],
             selectedNoteID: note.id,
             createdAt: now()
@@ -177,9 +177,23 @@ final class NotesStore {
 
     func renameWorkspace(_ id: Workspace.ID, to name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let index = workspaces.firstIndex(where: { $0.id == id }) else { return }
-        workspaces[index].name = trimmed
+        guard !trimmed.isEmpty, let index = workspaces.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        workspaces[index].name = uniqueWorkspaceName(trimmed, excluding: id)
         scheduleSave()
+    }
+
+    private func uniqueWorkspaceName(_ name: String, excluding id: Workspace.ID? = nil) -> String {
+        var candidate = name
+        var suffix = 2
+        while workspaces.contains(where: {
+            $0.id != id && $0.name.caseInsensitiveCompare(candidate) == .orderedSame
+        }) {
+            candidate = "\(name) \(suffix)"
+            suffix += 1
+        }
+        return candidate
     }
 
     func deleteWorkspace(_ id: Workspace.ID) {
@@ -220,6 +234,82 @@ final class NotesStore {
             workspace.notes[index].isPinned.toggle()
         }
         scheduleSave()
+    }
+
+    /// Duplicates a note in its workspace and selects the copy when that
+    /// workspace is active. Returns the new note's ID.
+    @discardableResult
+    func duplicateNote(_ id: Note.ID) -> Note.ID? {
+        guard let location = locate(id) else { return nil }
+        let original = workspaces[location.workspace].notes[location.note]
+        let copy = Note(
+            content: original.content,
+            richTextData: original.richTextData,
+            createdAt: now(),
+            modifiedAt: now(),
+            lastOpenedAt: now(),
+            isPinned: original.isPinned
+        )
+
+        workspaces[location.workspace].notes.append(copy)
+        if location.workspace == activeIndex {
+            workspaces[location.workspace].selectedNoteID = copy.id
+            markOpened(copy.id)
+        }
+        scheduleSave()
+        return copy.id
+    }
+
+    @discardableResult
+    func duplicateSelectedNote() -> Note.ID? {
+        duplicateNote(selectedID)
+    }
+
+    /// Moves a note to another workspace while keeping both workspaces valid.
+    @discardableResult
+    func moveNote(_ id: Note.ID, to workspaceID: Workspace.ID) -> Bool {
+        guard let source = locate(id),
+              source.workspace != workspaces.firstIndex(where: { $0.id == workspaceID }),
+              let target = workspaces.firstIndex(where: { $0.id == workspaceID }) else {
+            return false
+        }
+
+        let note = workspaces[source.workspace].notes.remove(at: source.note)
+        let sourceWasActive = source.workspace == activeIndex
+
+        if workspaces[source.workspace].notes.isEmpty {
+            let replacement = Note(createdAt: now())
+            workspaces[source.workspace].notes.append(replacement)
+            workspaces[source.workspace].selectedNoteID = replacement.id
+        } else if workspaces[source.workspace].selectedNoteID == id {
+            workspaces[source.workspace].selectedNoteID =
+                Self.sortedNotes(workspaces[source.workspace].notes)[0].id
+        }
+
+        workspaces[target].notes.append(note)
+        if sourceWasActive {
+            markOpened(selectedID)
+        }
+        scheduleSave()
+        return true
+    }
+
+    func selectNextNote() {
+        let ordered = notesByRecency
+        guard ordered.count > 1,
+              let index = ordered.firstIndex(where: { $0.id == selectedID }) else {
+            return
+        }
+        select(ordered[(index + 1) % ordered.count].id)
+    }
+
+    func selectPreviousNote() {
+        let ordered = notesByRecency
+        guard ordered.count > 1,
+              let index = ordered.firstIndex(where: { $0.id == selectedID }) else {
+            return
+        }
+        select(ordered[(index - 1 + ordered.count) % ordered.count].id)
     }
 
     /// Reuses the selected note when it is still empty instead of piling up blank notes.
@@ -415,6 +505,7 @@ final class NotesStore {
     private static func sortedNotes(_ notes: [Note]) -> [Note] {
         notes.sorted {
             if $0.isPinned != $1.isPinned { return $0.isPinned && !$1.isPinned }
+            if $0.modifiedAt != $1.modifiedAt { return $0.modifiedAt > $1.modifiedAt }
             return $0.createdAt > $1.createdAt
         }
     }

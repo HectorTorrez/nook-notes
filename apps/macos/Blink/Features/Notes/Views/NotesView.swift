@@ -351,6 +351,8 @@ struct NotesView: View {
         switch action {
         case .newNote:
             store.createNote()
+        case .duplicateNote:
+            store.duplicateSelectedNote()
         case .switchWorkspace:
             Task {
                 try? await Task.sleep(for: .milliseconds(150))

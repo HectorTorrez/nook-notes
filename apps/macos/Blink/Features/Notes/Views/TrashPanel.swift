@@ -23,6 +23,7 @@ struct TrashPanel: View {
                 items: entries,
                 rowHeight: 54,
                 listCaption: countLabel,
+                listNoun: "deleted note",
                 emptyIcon: "trash",
                 matches: { entry, query in
                     entry.note.content.localizedCaseInsensitiveContains(query)

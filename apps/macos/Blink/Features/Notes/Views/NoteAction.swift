@@ -3,6 +3,7 @@ import SwiftUI
 
 enum NoteAction: String, CaseIterable, Identifiable {
     case newNote
+    case duplicateNote
     case switchWorkspace
     case browseNotes
     case copyNote
@@ -16,6 +17,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .newNote: "New Note"
+        case .duplicateNote: "Duplicate Note"
         case .switchWorkspace: "Workspaces"
         case .browseNotes: "Browse Notes"
         case .copyNote: "Copy Note"
@@ -29,6 +31,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .newNote: "square.and.pencil"
+        case .duplicateNote: "plus.square.on.square"
         case .switchWorkspace: "square.stack.3d.up.fill"
         case .browseNotes: "square.stack.fill"
         case .copyNote: "doc.on.doc.fill"
@@ -42,6 +45,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
     var tint: Color {
         switch self {
         case .newNote: .orange
+        case .duplicateNote: .blue
         case .switchWorkspace: .purple
         case .browseNotes: .blue
         case .copyNote: .teal
@@ -55,6 +59,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
     var keyboardShortcut: KeyboardShortcut? {
         switch self {
         case .newNote: KeyboardShortcut("n")
+        case .duplicateNote: KeyboardShortcut("d", modifiers: [.command, .shift])
         case .switchWorkspace: KeyboardShortcut("o", modifiers: [.command, .shift])
         case .browseNotes: KeyboardShortcut("p")
         case .copyNote: KeyboardShortcut("c", modifiers: [.command, .shift])
@@ -68,6 +73,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
     var shortcutKeys: [String] {
         switch self {
         case .newNote: ["⌘", "N"]
+        case .duplicateNote: ["⇧", "⌘", "D"]
         case .switchWorkspace: ["⇧", "⌘", "O"]
         case .browseNotes: ["⌘", "P"]
         case .copyNote: ["⇧", "⌘", "C"]
