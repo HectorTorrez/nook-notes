@@ -195,7 +195,7 @@ final class RichTextController {
     @discardableResult
     func applyLink(_ value: String?) -> Bool {
         guard hasSelection else { return false }
-        let normalized = Self.normalizedLink(value)
+        let normalized = RichTextLink.normalized(value)
         editSelection(actionName: normalized == nil ? "Remove Link" : "Link") { storage, range in
             if let normalized {
                 storage.addAttribute(.link, value: normalized, range: range)
@@ -521,12 +521,4 @@ final class RichTextController {
         hasSelection = false
     }
 
-    private static func normalizedLink(_ value: String?) -> String? {
-        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !trimmed.isEmpty else { return nil }
-        if let url = URL(string: trimmed), url.scheme != nil {
-            return trimmed
-        }
-        return "https://\(trimmed)"
-    }
 }

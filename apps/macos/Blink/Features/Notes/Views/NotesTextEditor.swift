@@ -79,6 +79,8 @@ struct NotesTextEditor: NSViewRepresentable {
             coordinator?.parent.onEscape() ?? false
         }
 
+        textView.baseFontSize = fontSize
+        textView.fontFamily = preferences.fontFamily
         applyPreferences(to: textView)
         context.coordinator.noteID = noteID
         context.coordinator.appliedFontSize = fontSize
@@ -98,11 +100,13 @@ struct NotesTextEditor: NSViewRepresentable {
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        guard let textView = scrollView.documentView as? NSTextView else { return }
+        guard let textView = scrollView.documentView as? NotesTextView else { return }
         let coordinator = context.coordinator
         coordinator.parent = self
 
         textView.insertionPointColor = NSColor(caretColor)
+        textView.baseFontSize = fontSize
+        textView.fontFamily = preferences.fontFamily
         applyPreferences(to: textView)
         controller.baseFontSize = fontSize
         controller.fontFamily = preferences.fontFamily
@@ -204,12 +208,78 @@ struct NotesTextEditor: NSViewRepresentable {
 }
 
 /// Editor text view that lets Escape dismiss the floating formatting bar by
-/// clearing the current selection.
+/// clearing the current selection, and sanitizes external rich text before it
+/// reaches the document.
 final class NotesTextView: NSTextView {
     var onCancel: (() -> Bool)?
+    var baseFontSize: CGFloat = 16
+    var fontFamily: EditorFontFamily = .system
 
     override func cancelOperation(_ sender: Any?) {
         if onCancel?() == true { return }
         super.cancelOperation(sender)
+    }
+
+    override func paste(_ sender: Any?) {
+        if let richText = RichTextSanitizer.richText(
+            from: .general,
+            fontSize: baseFontSize,
+            family: fontFamily
+        ) {
+            insertText(richText, replacementRange: selectedRange())
+        } else {
+            super.paste(sender)
+        }
+    }
+
+    override func copy(_ sender: Any?) {
+        let data = selectedRichTextData()
+        super.copy(sender)
+        if let data {
+            NSPasteboard.general.setData(data, forType: .blinkRichText)
+        }
+    }
+
+    override func cut(_ sender: Any?) {
+        let data = selectedRichTextData()
+        super.cut(sender)
+        if let data {
+            NSPasteboard.general.setData(data, forType: .blinkRichText)
+        }
+    }
+
+    override func readSelection(from pboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
+        let before = selectedRange()
+        let previousLength = textStorage?.length ?? 0
+        let didRead = super.readSelection(from: pboard, type: type)
+        guard didRead, let storage = textStorage else { return didRead }
+
+        let insertedLength = storage.length - previousLength + before.length
+        guard insertedLength > 0, before.location + insertedLength <= storage.length else {
+            return didRead
+        }
+        sanitize(NSRange(location: before.location, length: insertedLength))
+        return didRead
+    }
+
+    private func selectedRichTextData() -> Data? {
+        guard let storage = textStorage else { return nil }
+        let range = selectedRange()
+        guard range.length > 0, NSMaxRange(range) <= storage.length else { return nil }
+        return RichTextCoding.data(from: storage.attributedSubstring(from: range))
+    }
+
+    private func sanitize(_ range: NSRange) {
+        guard let storage = textStorage, NSMaxRange(range) <= storage.length else { return }
+        let original = storage.attributedSubstring(from: range)
+        let sanitized = RichTextSanitizer.sanitize(
+            original,
+            fontSize: baseFontSize,
+            family: fontFamily
+        )
+        guard original.string == sanitized.string, !original.isEqual(to: sanitized) else {
+            return
+        }
+        storage.replaceCharacters(in: range, with: sanitized)
     }
 }
