@@ -5,6 +5,7 @@ struct NoteCommands: Commands {
     @FocusedValue(\.notesCommandHandler) private var handler
     @FocusedValue(\.richTextController) private var format
     @AppStorage("fontSize") private var fontSize: Double = 16
+    @AppStorage("alwaysOnTop") private var alwaysOnTop = true
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -91,6 +92,10 @@ struct NoteCommands: Commands {
 
         CommandMenu("Format") {
             formatMenu
+        }
+
+        CommandGroup(after: .toolbar) {
+            Toggle("Float Above Other Apps", isOn: $alwaysOnTop)
         }
     }
 

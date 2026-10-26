@@ -13,6 +13,7 @@ struct NotesView: View {
     @State private var formatController = RichTextController()
     @AppStorage("fontSize") private var fontSize: Double = 16
     @AppStorage("backgroundOpacity") private var backgroundOpacity: Double = 0.75
+    @AppStorage("alwaysOnTop") private var alwaysOnTop = true
     @AppStorage(Theme.accentPaletteKey) private var accentPalette: AccentPalette = Theme.defaultAccentPalette
     @AppStorage(EditorSettings.fontFamilyKey) private var fontFamily: EditorFontFamily = .system
     @AppStorage(EditorSettings.spellCheckingKey)
@@ -94,14 +95,11 @@ struct NotesView: View {
         }
         .background {
             WindowChrome(
+                alwaysOnTop: alwaysOnTop,
                 onTitleBarHeightChange: { titleBarHeight = $0 },
                 onHoverChange: { isHovering = $0 }
             )
             .ignoresSafeArea()
-        }
-        .background {
-            WindowSizeRecorder()
-                .ignoresSafeArea()
         }
         .animation(.easeOut(duration: 0.18), value: showsControls)
         .animation(.easeOut(duration: 0.18), value: showsFormatBar)

@@ -5,6 +5,7 @@ import SwiftUI
 /// reports its height, and reports whether the pointer is over the window,
 /// even while the app is inactive.
 struct WindowChrome: NSViewRepresentable {
+    var alwaysOnTop: Bool
     var onTitleBarHeightChange: (CGFloat) -> Void
     var onHoverChange: (Bool) -> Void
 
@@ -17,10 +18,13 @@ struct WindowChrome: NSViewRepresentable {
     func updateNSView(_ view: WindowChromeView, context: Context) {
         view.onTitleBarHeightChange = onTitleBarHeightChange
         view.onHoverChange = onHoverChange
+        view.alwaysOnTop = alwaysOnTop
+        view.applyLevel()
     }
 }
 
 final class WindowChromeView: NSView {
+    var alwaysOnTop = true
     var onTitleBarHeightChange: ((CGFloat) -> Void)?
     var onHoverChange: ((Bool) -> Void)?
     private var trackingArea: NSTrackingArea?
@@ -43,14 +47,37 @@ final class WindowChromeView: NSView {
         // Keep the note in place when the desktop is clicked ("Show Desktop"),
         // so a click outside the window only changes focus.
         window.collectionBehavior.insert(.stationary)
-        // Float above other apps so the note stays visible while working elsewhere.
-        window.level = .floating
+
+        window.setFrameAutosaveName("BlinkMainWindow")
+        clampToVisibleScreen(window)
+        applyLevel()
 
         DispatchQueue.main.async { [weak self] in
             guard let self, let window = self.window else { return }
             self.reportTitleBarHeight()
             let location = self.convert(window.mouseLocationOutsideOfEventStream, from: nil)
             self.onHoverChange?(self.bounds.contains(location))
+        }
+    }
+
+    func applyLevel() {
+        window?.level = alwaysOnTop ? .floating : .normal
+    }
+
+    private func clampToVisibleScreen(_ window: NSWindow) {
+        guard let screen = window.screen ?? NSScreen.main else { return }
+        let visible = screen.visibleFrame
+        var frame = window.frame
+        frame.origin.x = min(
+            max(frame.origin.x, visible.minX),
+            max(visible.minX, visible.maxX - frame.width)
+        )
+        frame.origin.y = min(
+            max(frame.origin.y, visible.minY),
+            max(visible.minY, visible.maxY - frame.height)
+        )
+        if frame != window.frame {
+            window.setFrame(frame, display: false)
         }
     }
 
