@@ -14,5 +14,9 @@ struct BlinkApp: App {
         .commands {
             NoteCommands(store: store)
         }
+
+        Settings {
+            SettingsView()
+        }
     }
 }

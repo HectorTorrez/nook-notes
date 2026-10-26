@@ -9,6 +9,7 @@ import Observation
 final class RichTextController {
     @ObservationIgnored weak var textView: NSTextView?
     @ObservationIgnored var baseFontSize: CGFloat = 16
+    @ObservationIgnored var fontFamily: EditorFontFamily = .system
 
     private(set) var hasSelection = false
     private(set) var heading: HeadingLevel?
@@ -286,7 +287,8 @@ final class RichTextController {
                         size: self.normalizedSize(for: attributes),
                         bold: traits.contains(.boldFontMask),
                         italic: traits.contains(.italicFontMask),
-                        code: attributes[.blinkCode] != nil
+                        code: attributes[.blinkCode] != nil,
+                        family: self.fontFamily
                     )
                     updates.append((subrange, font))
                 }
@@ -306,7 +308,8 @@ final class RichTextController {
                 size: normalizedSize(for: attributes),
                 bold: traits.contains(.boldFontMask),
                 italic: traits.contains(.italicFontMask),
-                code: attributes[.blinkCode] != nil
+                code: attributes[.blinkCode] != nil,
+                family: fontFamily
             )
             textView?.typingAttributes = attributes
             refresh()
@@ -323,7 +326,8 @@ final class RichTextController {
                 size: self.normalizedSize(for: attributes),
                 bold: level != nil || traits.contains(.boldFontMask),
                 italic: traits.contains(.italicFontMask),
-                code: attributes[.blinkCode] != nil
+                code: attributes[.blinkCode] != nil,
+                family: self.fontFamily
             )
             updates.append((subrange, font))
         }
@@ -408,7 +412,7 @@ final class RichTextController {
     }
 
     private func baseTypingAttributes() -> [NSAttributedString.Key: Any] {
-        NotesTextEditor.baseAttributes(fontSize: baseFontSize)
+        NotesTextEditor.baseAttributes(fontSize: baseFontSize, family: fontFamily)
     }
 
     private func normalizedAttributes(
@@ -433,7 +437,8 @@ final class RichTextController {
             size: normalizedSize(for: attributes),
             bold: traits.contains(.boldFontMask),
             italic: traits.contains(.italicFontMask),
-            code: attributes[.blinkCode] != nil
+            code: attributes[.blinkCode] != nil,
+            family: fontFamily
         )
     }
 

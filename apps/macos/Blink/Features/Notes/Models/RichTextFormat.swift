@@ -112,12 +112,18 @@ enum ListStyle: String, CaseIterable, Identifiable {
 
 /// Builds the concrete font for a run from its formatting flags.
 enum RichTextFont {
-    static func make(size: CGFloat, bold: Bool, italic: Bool, code: Bool) -> NSFont {
+    static func make(
+        size: CGFloat,
+        bold: Bool,
+        italic: Bool,
+        code: Bool,
+        family: EditorFontFamily = .system
+    ) -> NSFont {
         let base: NSFont
         if code {
             base = NSFont.monospacedSystemFont(ofSize: size, weight: bold ? .semibold : .regular)
         } else {
-            base = NSFont.systemFont(ofSize: size, weight: bold ? .semibold : .regular)
+            base = family.font(size: size, bold: bold)
         }
         guard italic else { return base }
         return NSFontManager.shared.convert(base, toHaveTrait: .italicFontMask)
