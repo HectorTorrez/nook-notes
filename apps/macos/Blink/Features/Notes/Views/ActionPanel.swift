@@ -41,7 +41,7 @@ struct ActionPanel: View {
         switch action {
         case .restoreLastDeleted: store.lastDeleted != nil
         case .copyNote, .copyAsMarkdown: !store.selectedNote.isEmpty
-        case .newNote, .switchWorkspace, .browseNotes, .deleteNote: true
+        case .newNote, .switchWorkspace, .browseNotes, .deleteNote, .trash: true
         }
     }
 
@@ -50,6 +50,7 @@ struct ActionPanel: View {
         case .restoreLastDeleted: store.lastDeleted?.title
         case .switchWorkspace: store.activeWorkspace.name
         case .browseNotes: store.notes.count == 1 ? "1 note" : "\(store.notes.count) notes"
+        case .trash: store.trashCount == 1 ? "1 note" : "\(store.trashCount) notes"
         default: nil
         }
     }

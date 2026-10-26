@@ -10,7 +10,7 @@ import os
 final class NotesStore {
     private(set) var workspaces: [Workspace]
     private(set) var selectedWorkspaceID: Workspace.ID
-    private(set) var recentlyDeleted: [Note] = []
+    private(set) var trash: [TrashedNote] = []
 
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private let storage: NotesFileStorage?
@@ -25,8 +25,9 @@ final class NotesStore {
         self.now = now
         self.storage = storage
         let createdAt = now()
+        let library = storage?.load()
 
-        if let library = storage?.load() {
+        if let library {
             let repaired = Self.repaired(library.workspaces, now: createdAt)
             if repaired.isEmpty {
                 let workspace = Workspace.makeDefault(notes: notes, now: createdAt)
@@ -44,6 +45,7 @@ final class NotesStore {
             self.selectedWorkspaceID = workspace.id
         }
 
+        self.trash = library?.trash ?? []
         markOpened(selectedID)
 
         if storage != nil {
@@ -83,13 +85,14 @@ final class NotesStore {
     var canDeleteWorkspace: Bool { workspaces.count > 1 }
 
     var lastDeleted: Note? {
-        recentlyDeleted.last
+        trash.last?.note
     }
+
+    var trashCount: Int { trash.count }
 
     func selectWorkspace(_ id: Workspace.ID) {
         guard id != selectedWorkspaceID, workspaces.contains(where: { $0.id == id }) else { return }
         selectedWorkspaceID = id
-        recentlyDeleted = []
         markOpened(selectedID)
         scheduleSave()
     }
@@ -107,7 +110,6 @@ final class NotesStore {
         )
         workspaces.append(workspace)
         selectedWorkspaceID = workspace.id
-        recentlyDeleted = []
         scheduleSave()
         return true
     }
@@ -120,12 +122,24 @@ final class NotesStore {
     }
 
     func deleteWorkspace(_ id: Workspace.ID) {
-        guard canDeleteWorkspace, let index = workspaces.firstIndex(where: { $0.id == id }) else { return }
+        guard canDeleteWorkspace, let index = workspaces.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        let removedWorkspace = workspaces[index]
         let wasActive = selectedWorkspaceID == id
+
+        for note in removedWorkspace.notes where !note.isEmpty {
+            trash.append(TrashedNote(
+                note: note,
+                workspaceID: removedWorkspace.id,
+                workspaceName: removedWorkspace.name,
+                deletedAt: now()
+            ))
+        }
+
         workspaces.remove(at: index)
         if wasActive {
             selectedWorkspaceID = workspacesByRecency[0].id
-            recentlyDeleted = []
             markOpened(selectedID)
         }
         scheduleSave()
@@ -199,14 +213,22 @@ final class NotesStore {
     func deleteNote(_ id: Note.ID) {
         guard notes.contains(where: { $0.id == id }) else { return }
         let deletedSelection = selectedID == id
+        let workspaceID = activeWorkspace.id
+        let workspaceName = activeWorkspace.name
+
         updateActive { workspace in
             guard let index = workspace.notes.firstIndex(where: { $0.id == id }) else { return }
             let removed = workspace.notes.remove(at: index)
             if !removed.isEmpty {
-                recentlyDeleted.append(removed)
+                self.trash.append(TrashedNote(
+                    note: removed,
+                    workspaceID: workspaceID,
+                    workspaceName: workspaceName,
+                    deletedAt: self.now()
+                ))
             }
             if workspace.notes.isEmpty {
-                workspace.notes.append(Note(createdAt: now()))
+                workspace.notes.append(Note(createdAt: self.now()))
             }
             if workspace.selectedNoteID == id {
                 workspace.selectedNoteID = Self.sortedNotes(workspace.notes)[0].id
@@ -235,15 +257,50 @@ final class NotesStore {
     }
 
     func restoreLastDeleted() {
-        guard let note = recentlyDeleted.popLast() else { return }
-        updateActive { workspace in
-            if workspace.notes.first(where: { $0.id == workspace.selectedNoteID })?.isEmpty == true {
-                workspace.notes.removeAll { $0.id == workspace.selectedNoteID }
-            }
-            workspace.notes.append(note)
-            workspace.selectedNoteID = note.id
+        guard let entry = trash.last else { return }
+        restore(entry.id)
+    }
+
+    /// Restores a trashed note to its original workspace, falling back to the
+    /// active workspace when that workspace no longer exists.
+    func restore(_ entryID: TrashedNote.ID) {
+        guard let index = trash.firstIndex(where: { $0.id == entryID }) else { return }
+        let entry = trash.remove(at: index)
+
+        let targetID = workspaces.contains(where: { $0.id == entry.workspaceID })
+            ? entry.workspaceID
+            : selectedWorkspaceID
+        guard let targetIndex = workspaces.firstIndex(where: { $0.id == targetID }) else {
+            return
         }
-        markOpened(note.id)
+
+        selectedWorkspaceID = targetID
+        var workspace = workspaces[targetIndex]
+
+        if let emptyIndex = workspace.notes.firstIndex(
+            where: { $0.id == workspace.selectedNoteID }
+        ), workspace.notes[emptyIndex].isEmpty {
+            workspace.notes.remove(at: emptyIndex)
+        }
+
+        if !workspace.notes.contains(where: { $0.id == entry.note.id }) {
+            workspace.notes.append(entry.note)
+        }
+        workspace.selectedNoteID = entry.note.id
+        workspaces[targetIndex] = workspace
+
+        markOpened(entry.note.id)
+        scheduleSave()
+    }
+
+    func deletePermanently(_ entryID: TrashedNote.ID) {
+        trash.removeAll { $0.id == entryID }
+        scheduleSave()
+    }
+
+    func emptyTrash() {
+        guard !trash.isEmpty else { return }
+        trash.removeAll()
         scheduleSave()
     }
 
@@ -253,7 +310,11 @@ final class NotesStore {
         pendingSave = nil
         guard let storage else { return }
         do {
-            try storage.save(LibrarySnapshot(workspaces: workspaces, selectedWorkspaceID: selectedWorkspaceID))
+            try storage.save(LibrarySnapshot(
+                workspaces: workspaces,
+                selectedWorkspaceID: selectedWorkspaceID,
+                trash: trash
+            ))
         } catch {
             Self.logger.error("Failed to save notes: \(error.localizedDescription, privacy: .public)")
         }

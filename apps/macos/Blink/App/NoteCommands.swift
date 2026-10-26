@@ -52,6 +52,7 @@ struct NoteCommands: Commands {
             button(for: .deleteNote)
             button(for: .restoreLastDeleted)
                 .disabled(handler == nil || store.lastDeleted == nil)
+            button(for: .trash)
         }
 
         CommandMenu("Format") {

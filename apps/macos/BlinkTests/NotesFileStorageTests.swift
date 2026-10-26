@@ -54,6 +54,39 @@ struct NotesFileStorageTests {
     }
 
     @Test
+    func decodesLibrariesThatPredateTheTrash() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("notes.json")
+        let storage = NotesFileStorage(url: url)
+
+        let note = Note(content: "Old note", createdAt: epoch)
+        let workspace = Workspace(
+            name: Workspace.defaultName,
+            notes: [note],
+            selectedNoteID: note.id,
+            createdAt: epoch
+        )
+        try storage.save(LibrarySnapshot(
+            workspaces: [workspace],
+            selectedWorkspaceID: workspace.id
+        ))
+
+        var json = try #require(
+            JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        )
+        json.removeValue(forKey: "trash")
+        try JSONSerialization.data(
+            withJSONObject: json,
+            options: [.prettyPrinted, .sortedKeys]
+        ).write(to: url)
+
+        let loaded = try #require(storage.load())
+        #expect(loaded.trash.isEmpty)
+        #expect(loaded.workspaces[0].notes[0].content == "Old note")
+    }
+
+    @Test
     func loadReturnsNilWhenNothingHasBeenSaved() throws {
         let directory = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

@@ -196,6 +196,15 @@ struct NotesView: View {
                     }
                 }
 
+                ChromeButton(systemImage: "trash", help: "Trash (⌥⌘T)") {
+                    panel = .trash
+                }
+                .popover(isPresented: isPresented(.trash), arrowEdge: .bottom) {
+                    TrashPanel(store: store) {
+                        panel = nil
+                    }
+                }
+
                 ChromeButton(systemImage: "square.and.pencil", help: "New Note (⌘N)") {
                     perform(.newNote)
                 }
@@ -342,6 +351,11 @@ struct NotesView: View {
             store.deleteNote(note.id)
         case .restoreLastDeleted:
             store.restoreLastDeleted()
+        case .trash:
+            Task {
+                try? await Task.sleep(for: .milliseconds(150))
+                panel = .trash
+            }
         }
     }
 
