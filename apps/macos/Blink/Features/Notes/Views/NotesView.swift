@@ -30,6 +30,8 @@ struct NotesView: View {
     private var detectsLinks = EditorSettings.detectsLinksDefault
     @AppStorage(EditorSettings.formatBarOnSelectionKey)
     private var showsFormatBarOnSelection = EditorSettings.showsFormatBarOnSelectionDefault
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     /// Clears the traffic lights on the leading edge of the title bar.
     private static let trafficLightsWidth: CGFloat = 86
@@ -70,6 +72,7 @@ struct NotesView: View {
                 richTextData: note.richTextData,
                 fontSize: fontSize,
                 preferences: editorPreferences,
+                accessibilityLabel: note.isEmpty ? "Note" : "Note, \(note.title)",
                 caretColor: accent,
                 controller: formatController,
                 onTextChange: { noteID, text in
@@ -90,7 +93,7 @@ struct NotesView: View {
         .ignoresSafeArea()
         .frame(minWidth: 400, minHeight: 200)
         .background {
-            GlassWindowBackground(tintOpacity: backgroundOpacity)
+            GlassWindowBackground(tintOpacity: reduceTransparency ? 1 : backgroundOpacity)
                 .ignoresSafeArea()
         }
         .background {
@@ -101,8 +104,8 @@ struct NotesView: View {
             )
             .ignoresSafeArea()
         }
-        .animation(.easeOut(duration: 0.18), value: showsControls)
-        .animation(.easeOut(duration: 0.18), value: showsFormatBar)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: showsControls)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: showsFormatBar)
         .navigationTitle(note.title)
         .focusedSceneValue(\.notesCommandHandler, NotesCommandHandler(
             perform: perform,
@@ -351,6 +354,7 @@ struct NotesView: View {
             store.createNote()
         case .duplicateNote:
             store.duplicateSelectedNote()
+            AccessibilityAnnouncement.post("Note duplicated")
         case .switchWorkspace:
             Task {
                 try? await Task.sleep(for: .milliseconds(150))
@@ -363,14 +367,16 @@ struct NotesView: View {
             }
         case .copyNote:
             note.copyToPasteboard()
-            confirmCopy()
+            confirmCopy("Note copied")
         case .copyAsMarkdown:
             note.copyMarkdownToPasteboard()
-            confirmCopy()
+            confirmCopy("Note copied as Markdown")
         case .deleteNote:
             store.deleteNote(note.id)
+            AccessibilityAnnouncement.post("Note moved to trash")
         case .restoreLastDeleted:
             store.restoreLastDeleted()
+            AccessibilityAnnouncement.post("Note restored")
         case .trash:
             Task {
                 try? await Task.sleep(for: .milliseconds(150))
@@ -379,11 +385,16 @@ struct NotesView: View {
         }
     }
 
-    private func confirmCopy() {
-        withAnimation(.easeOut(duration: 0.15)) { showsCopyConfirmation = true }
+    private func confirmCopy(_ announcement: String) {
+        AccessibilityAnnouncement.post(announcement)
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) {
+            showsCopyConfirmation = true
+        }
         Task {
             try? await Task.sleep(for: .seconds(1.2))
-            withAnimation(.easeOut(duration: 0.25)) { showsCopyConfirmation = false }
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) {
+                showsCopyConfirmation = false
+            }
         }
     }
 }

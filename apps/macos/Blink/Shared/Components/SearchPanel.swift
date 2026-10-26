@@ -24,6 +24,7 @@ struct SearchPanel<Item: Identifiable, Row: View, Trailing: View>: View {
     @State private var hoveredID: Item.ID?
     @FocusState private var isSearchFocused: Bool
     @Environment(\.themeAccent) private var accent
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static var maxListHeight: CGFloat { 320 }
     private static var listPadding: CGFloat { Theme.listPadding }
@@ -113,7 +114,7 @@ struct SearchPanel<Item: Identifiable, Row: View, Trailing: View>: View {
         .padding(.horizontal, 10)
         .padding(.top, 10)
         .padding(.bottom, listCaption == nil ? 10 : 6)
-        .animation(.easeOut(duration: 0.15), value: isSearchFocused)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: isSearchFocused)
     }
 
     private var list: some View {
@@ -158,7 +159,7 @@ struct SearchPanel<Item: Identifiable, Row: View, Trailing: View>: View {
                     }
                 }
                 .padding(Self.listPadding)
-                .animation(.easeOut(duration: 0.12), value: highlightedID)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: highlightedID)
             }
             .scrollIndicators(.automatic)
             .frame(height: listHeight)
