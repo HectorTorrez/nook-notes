@@ -95,6 +95,19 @@ struct NotesStoreTests {
     }
 
     @Test
+    func importNotesReplacesTheEmptySelectedNoteAndSelectsTheFirstImport() {
+        let store = NotesStore(now: { self.epoch })
+        let first = Note(content: "Imported one", createdAt: epoch)
+        let second = Note(content: "Imported two", createdAt: epoch)
+
+        store.importNotes([first, second])
+
+        #expect(store.notes.count == 2)
+        #expect(store.selectedID == first.id)
+        #expect(store.notes.contains(where: { $0.id == second.id }))
+    }
+
+    @Test
     func richTextUpdatesTargetTheNoteIDInsteadOfTheCurrentSelection() throws {
         let store = NotesStore(now: { self.epoch })
         store.updateSelectedContent("First", richTextData: nil)

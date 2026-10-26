@@ -218,6 +218,22 @@ final class NotesStore {
         scheduleSave()
     }
 
+    /// Adds imported notes to the active workspace, replacing an untouched
+    /// empty note, and selects the first imported note.
+    func importNotes(_ notes: [Note]) {
+        guard !notes.isEmpty else { return }
+        updateActive { workspace in
+            if let index = workspace.notes.firstIndex(where: { $0.id == workspace.selectedNoteID }),
+               workspace.notes[index].isEmpty {
+                workspace.notes.remove(at: index)
+            }
+            workspace.notes.append(contentsOf: notes)
+            workspace.selectedNoteID = notes[0].id
+        }
+        markOpened(notes[0].id)
+        scheduleSave()
+    }
+
     func restoreLastDeleted() {
         guard let note = recentlyDeleted.popLast() else { return }
         updateActive { workspace in
