@@ -88,7 +88,12 @@ enum RichTextSanitizer {
             code: isCode,
             family: family
         )
-        result[.foregroundColor] = NSColor.labelColor
+        result[.foregroundColor] = isQuote
+            ? RichTextStyle.quoteColor
+            : NSColor.labelColor
+        if isCode {
+            result[.backgroundColor] = RichTextStyle.codeBackground
+        }
 
         if let underline = attributes[.underlineStyle] as? Int, underline != 0 {
             result[.underlineStyle] = NSUnderlineStyle.single.rawValue

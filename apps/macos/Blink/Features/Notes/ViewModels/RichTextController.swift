@@ -23,6 +23,11 @@ final class RichTextController {
     private(set) var alignment: NSTextAlignment = .natural
     private(set) var link: String?
 
+    /// A task list can be toggled between its empty and checked markers.
+    var isChecklist: Bool { listStyle == .task }
+
+    var canAdjustIndent: Bool { listStyle != nil || isBlockquote }
+
     func attach(_ textView: NSTextView) {
         self.textView = textView
         refresh()
@@ -36,7 +41,8 @@ final class RichTextController {
         hasSelection = selection.length > 0
 
         guard let storage = textView.textStorage, storage.length > 0 else {
-            apply(attributes: baseTypingAttributes())
+            let typing = textView.typingAttributes
+            apply(attributes: typing[.font] != nil ? typing : baseTypingAttributes())
             return
         }
 
@@ -90,6 +96,21 @@ final class RichTextController {
 
     func setHeading(_ level: HeadingLevel) {
         let target = (heading == level) ? nil : level
+        guard let textView, let storage = textView.textStorage else { return }
+        guard storage.length > 0 else {
+            var attributes = typingAttributes()
+            if let target {
+                attributes[.blinkHeading] = target.rawValue
+            } else {
+                attributes.removeValue(forKey: .blinkHeading)
+            }
+            attributes[.font] = font(for: attributes)
+            textView.typingAttributes = attributes
+            heading = target
+            refresh()
+            return
+        }
+
         editParagraphs(actionName: "Heading") { storage, range in
             if let target {
                 storage.addAttribute(.blinkHeading, value: target.rawValue, range: range)
@@ -102,6 +123,26 @@ final class RichTextController {
 
     func setList(_ style: ListStyle) {
         let target = (listStyle == style) ? nil : style
+        guard let textView, let storage = textView.textStorage else { return }
+        guard storage.length > 0 else {
+            setTypingParagraphStyle { paragraphStyle in
+                if let target {
+                    let list = NSTextList(markerFormat: target.markerFormat, options: 0)
+                    list.startingItemNumber = 1
+                    paragraphStyle.textLists = [list]
+                } else {
+                    paragraphStyle.textLists = []
+                }
+                self.applyIndentation(
+                    to: paragraphStyle,
+                    list: target != nil,
+                    quote: self.isBlockquote
+                )
+            }
+            listStyle = target
+            return
+        }
+
         editParagraphs(actionName: "List") { storage, range in
             let paragraphStyle = self.mutableParagraphStyle(at: range, storage: storage)
             let quoted = storage.attribute(.blinkBlockquote, at: range.location, effectiveRange: nil) != nil
@@ -119,6 +160,39 @@ final class RichTextController {
 
     func toggleBlockquote() {
         let applying = !isBlockquote
+        guard let textView, let storage = textView.textStorage else { return }
+        guard storage.length > 0 else {
+            var attributes = typingAttributes()
+            if applying {
+                attributes[.blinkBlockquote] = true
+            } else {
+                attributes.removeValue(forKey: .blinkBlockquote)
+            }
+            attributes[.foregroundColor] = applying
+                ? RichTextStyle.quoteColor
+                : NSColor.labelColor
+            attributes[.font] = font(for: attributes)
+
+            let paragraphStyle = NSMutableParagraphStyle()
+            if let existing = attributes[.paragraphStyle] as? NSParagraphStyle {
+                paragraphStyle.setParagraphStyle(existing)
+            }
+            paragraphStyle.lineSpacing = NotesTextEditor.lineSpacing
+            applyIndentation(
+                to: paragraphStyle,
+                list: !paragraphStyle.textLists.isEmpty,
+                quote: applying
+            )
+            attributes[.paragraphStyle] = paragraphStyle
+
+            textView.defaultParagraphStyle = paragraphStyle
+            textView.typingAttributes = attributes
+            (textView as? NotesTextView)?.pendingParagraphStyle = paragraphStyle
+            isBlockquote = applying
+            refresh()
+            return
+        }
+
         editParagraphs(actionName: "Block Quote") { storage, range in
             let paragraphStyle = self.mutableParagraphStyle(at: range, storage: storage)
             let hasList = !paragraphStyle.textLists.isEmpty
@@ -127,16 +201,74 @@ final class RichTextController {
             } else {
                 storage.removeAttribute(.blinkBlockquote, range: range)
             }
+            storage.addAttribute(
+                .foregroundColor,
+                value: applying ? RichTextStyle.quoteColor : NSColor.labelColor,
+                range: range
+            )
             self.applyIndentation(to: paragraphStyle, list: hasList, quote: applying)
             storage.addAttribute(.paragraphStyle, value: paragraphStyle, range: range)
         }
     }
 
     func setAlignment(_ value: NSTextAlignment) {
+        guard let storage = textView?.textStorage else { return }
+        guard storage.length > 0 else {
+            setTypingParagraphStyle { $0.alignment = value }
+            alignment = value
+            return
+        }
         editParagraphs(actionName: "Alignment") { storage, range in
             let style = self.mutableParagraphStyle(at: range, storage: storage)
             style.alignment = value
             storage.addAttribute(.paragraphStyle, value: style, range: range)
+        }
+    }
+
+    /// Flips a task-list item between its unchecked box and its checkmark.
+    func toggleChecklist() {
+        guard isChecklist else { return }
+        editParagraphs(actionName: "Checklist") { storage, range in
+            let paragraphStyle = self.mutableParagraphStyle(at: range, storage: storage)
+            guard let list = paragraphStyle.textLists.first,
+                  list.markerFormat == .box || list.markerFormat == .check else { return }
+            let marker: NSTextList.MarkerFormat = list.markerFormat == .check ? .box : .check
+            let replacement = NSTextList(markerFormat: marker, options: 0)
+            replacement.startingItemNumber = list.startingItemNumber
+            paragraphStyle.textLists = [replacement]
+            storage.addAttribute(.paragraphStyle, value: paragraphStyle, range: range)
+        }
+    }
+
+    /// Moves list and quote paragraphs in or out by a fixed step.
+    func adjustIndent(by delta: CGFloat) {
+        guard canAdjustIndent, let storage = textView?.textStorage else { return }
+        guard storage.length > 0 else {
+            setTypingParagraphStyle { paragraphStyle in
+                let next = min(66, max(0, paragraphStyle.headIndent + delta))
+                let applied = next - paragraphStyle.headIndent
+                paragraphStyle.headIndent = next
+                paragraphStyle.firstLineHeadIndent = max(
+                    0,
+                    paragraphStyle.firstLineHeadIndent + applied
+                )
+                paragraphStyle.tabStops = [NSTextTab(textAlignment: .left, location: next)]
+            }
+            return
+        }
+
+        editParagraphs(actionName: delta > 0 ? "Increase Indent" : "Decrease Indent") { storage, range in
+            let paragraphStyle = self.mutableParagraphStyle(at: range, storage: storage)
+            let next = min(66, max(0, paragraphStyle.headIndent + delta))
+            let applied = next - paragraphStyle.headIndent
+            guard applied != 0 else { return }
+            paragraphStyle.headIndent = next
+            paragraphStyle.firstLineHeadIndent = max(
+                0,
+                paragraphStyle.firstLineHeadIndent + applied
+            )
+            paragraphStyle.tabStops = [NSTextTab(textAlignment: .left, location: next)]
+            storage.addAttribute(.paragraphStyle, value: paragraphStyle, range: range)
         }
     }
 
@@ -185,6 +317,11 @@ final class RichTextController {
                 attributes.removeValue(forKey: .blinkCode)
             }
             attributes[.font] = font(for: attributes)
+            if applying {
+                attributes[.backgroundColor] = RichTextStyle.codeBackground
+            } else {
+                attributes.removeValue(forKey: .backgroundColor)
+            }
             textView?.typingAttributes = attributes
             refresh()
         }
@@ -316,23 +453,51 @@ final class RichTextController {
         }
     }
 
-    /// Recomputes every run's font from its heading, code and trait flags.
+    /// Recomputes every run's font and presentation from its heading, code,
+    /// quote and trait flags.
     private func rewriteFonts(in range: NSRange, storage: NSTextStorage) {
-        var updates: [(NSRange, NSFont)] = []
+        var fontUpdates: [(NSRange, NSFont)] = []
+        var colorUpdates: [(NSRange, NSColor)] = []
+        var backgroundUpdates: [(NSRange, NSColor?)] = []
+
         storage.enumerateAttributes(in: range, options: []) { attributes, subrange, _ in
             let traits = (attributes[.font] as? NSFont).map { NSFontManager.shared.traits(of: $0) } ?? []
             let level = (attributes[.blinkHeading] as? Int).flatMap(HeadingLevel.init(rawValue:))
-            let font = RichTextFont.make(
-                size: self.normalizedSize(for: attributes),
-                bold: level != nil || traits.contains(.boldFontMask),
-                italic: traits.contains(.italicFontMask),
-                code: attributes[.blinkCode] != nil,
-                family: self.fontFamily
-            )
-            updates.append((subrange, font))
+            let isCode = attributes[.blinkCode] != nil
+            let isQuote = attributes[.blinkBlockquote] != nil
+
+            fontUpdates.append((
+                subrange,
+                RichTextFont.make(
+                    size: self.normalizedSize(for: attributes),
+                    bold: level != nil || traits.contains(.boldFontMask),
+                    italic: traits.contains(.italicFontMask),
+                    code: isCode,
+                    family: self.fontFamily
+                )
+            ))
+            colorUpdates.append((
+                subrange,
+                isQuote ? RichTextStyle.quoteColor : NSColor.labelColor
+            ))
+            backgroundUpdates.append((
+                subrange,
+                isCode ? RichTextStyle.codeBackground : nil
+            ))
         }
-        for (subrange, font) in updates {
+
+        for (subrange, font) in fontUpdates {
             storage.addAttribute(.font, value: font, range: subrange)
+        }
+        for (subrange, color) in colorUpdates {
+            storage.addAttribute(.foregroundColor, value: color, range: subrange)
+        }
+        for (subrange, color) in backgroundUpdates {
+            if let color {
+                storage.addAttribute(.backgroundColor, value: color, range: subrange)
+            } else {
+                storage.removeAttribute(.backgroundColor, range: subrange)
+            }
         }
     }
 
@@ -411,6 +576,29 @@ final class RichTextController {
         return attributes
     }
 
+    /// Mutates the paragraph style that will apply to the next typed character.
+    private func setTypingParagraphStyle(
+        _ mutate: (NSMutableParagraphStyle) -> Void
+    ) {
+        guard let textView else { return }
+        var attributes = typingAttributes()
+        let style = NSMutableParagraphStyle()
+        if let existing = attributes[.paragraphStyle] as? NSParagraphStyle {
+            style.setParagraphStyle(existing)
+        }
+        style.lineSpacing = NotesTextEditor.lineSpacing
+        mutate(style)
+        attributes[.paragraphStyle] = style
+        attributes[.font] = font(for: attributes)
+        attributes[.foregroundColor] = attributes[.blinkBlockquote] != nil
+            ? RichTextStyle.quoteColor
+            : NSColor.labelColor
+        textView.defaultParagraphStyle = style
+        textView.typingAttributes = attributes
+        (textView as? NotesTextView)?.pendingParagraphStyle = style
+        refresh()
+    }
+
     private func baseTypingAttributes() -> [NSAttributedString.Key: Any] {
         NotesTextEditor.baseAttributes(fontSize: baseFontSize, family: fontFamily)
     }
@@ -420,7 +608,14 @@ final class RichTextController {
     ) -> [NSAttributedString.Key: Any] {
         var normalized = attributes
         normalized[.font] = font(for: attributes)
-        normalized[.foregroundColor] = NSColor.labelColor
+        normalized[.foregroundColor] = attributes[.blinkBlockquote] != nil
+            ? RichTextStyle.quoteColor
+            : NSColor.labelColor
+        if attributes[.blinkCode] != nil {
+            normalized[.backgroundColor] = RichTextStyle.codeBackground
+        } else {
+            normalized.removeValue(forKey: .backgroundColor)
+        }
 
         let style = NSMutableParagraphStyle()
         if let existing = attributes[.paragraphStyle] as? NSParagraphStyle {

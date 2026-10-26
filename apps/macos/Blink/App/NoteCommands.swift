@@ -75,6 +75,19 @@ struct NoteCommands: Commands {
                 .disabled(format == nil)
         }
 
+        Button("Toggle Checklist") { format?.toggleChecklist() }
+            .keyboardShortcut("k", modifiers: [.command, .control])
+            .disabled(format?.isChecklist != true)
+
+        Divider()
+
+        Button("Increase Indent") { format?.adjustIndent(by: 22) }
+            .keyboardShortcut("]", modifiers: [.command])
+            .disabled(format?.canAdjustIndent != true)
+        Button("Decrease Indent") { format?.adjustIndent(by: -22) }
+            .keyboardShortcut("[", modifiers: [.command])
+            .disabled(format?.canAdjustIndent != true)
+
         Divider()
 
         Button("Increase Text Size") {
