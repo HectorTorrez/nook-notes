@@ -27,6 +27,47 @@ struct Workspace: Identifiable, Equatable, Sendable, Codable {
         notes.count == 1 ? "1 note" : "\(notes.count) notes"
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case notes
+        case selectedNoteID
+        case createdAt
+    }
+
+    /// A note that failed to decode is dropped instead of making the entire
+    /// library unreadable.
+    private struct FailableNote: Decodable {
+        let note: Note?
+
+        init(from decoder: Decoder) throws {
+            note = try? Note(from: decoder)
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+            ?? Workspace.defaultName
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+
+        let decodedNotes = (try container.decodeIfPresent(
+            [FailableNote].self,
+            forKey: .notes
+        ) ?? []).compactMap(\.note)
+        notes = decodedNotes
+
+        if let selected = try container.decodeIfPresent(
+            Note.ID.self,
+            forKey: .selectedNoteID
+        ), decodedNotes.contains(where: { $0.id == selected }) {
+            selectedNoteID = selected
+        } else {
+            selectedNoteID = decodedNotes.first?.id ?? UUID()
+        }
+    }
+
     static func makeDefault(notes: [Note], now: Date) -> Workspace {
         let initial = notes.isEmpty ? [Note(createdAt: now)] : notes
         let selected = initial[0].id
@@ -41,6 +82,9 @@ struct Workspace: Identifiable, Equatable, Sendable, Codable {
 }
 
 struct LibrarySnapshot: Codable, Equatable, Sendable {
+    static let currentSchemaVersion = 1
+
+    var schemaVersion: Int
     var workspaces: [Workspace]
     var selectedWorkspaceID: Workspace.ID
     var trash: [TrashedNote]
@@ -48,8 +92,10 @@ struct LibrarySnapshot: Codable, Equatable, Sendable {
     init(
         workspaces: [Workspace],
         selectedWorkspaceID: Workspace.ID,
-        trash: [TrashedNote] = []
+        trash: [TrashedNote] = [],
+        schemaVersion: Int = currentSchemaVersion
     ) {
+        self.schemaVersion = schemaVersion
         self.workspaces = workspaces
         self.selectedWorkspaceID = selectedWorkspaceID
         self.trash = trash
@@ -65,9 +111,11 @@ struct LibrarySnapshot: Codable, Equatable, Sendable {
         workspaces = [migrated]
         selectedWorkspaceID = migrated.id
         trash = []
+        schemaVersion = Self.currentSchemaVersion
     }
 
     private enum CodingKeys: String, CodingKey {
+        case schemaVersion
         case workspaces
         case selectedWorkspaceID
         case trash
@@ -75,11 +123,12 @@ struct LibrarySnapshot: Codable, Equatable, Sendable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        workspaces = try container.decode([Workspace].self, forKey: .workspaces)
-        selectedWorkspaceID = try container.decode(
+        schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        workspaces = try container.decodeIfPresent([Workspace].self, forKey: .workspaces) ?? []
+        selectedWorkspaceID = try container.decodeIfPresent(
             Workspace.ID.self,
             forKey: .selectedWorkspaceID
-        )
+        ) ?? UUID()
         trash = try container.decodeIfPresent([TrashedNote].self, forKey: .trash) ?? []
     }
 }

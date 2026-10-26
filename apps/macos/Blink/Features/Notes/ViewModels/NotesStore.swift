@@ -11,11 +11,14 @@ final class NotesStore {
     private(set) var workspaces: [Workspace]
     private(set) var selectedWorkspaceID: Workspace.ID
     private(set) var trash: [TrashedNote] = []
+    private(set) var loadFailure: NotesFileStorage.LoadFailure? = nil
+    private(set) var saveError: String? = nil
 
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private let storage: NotesFileStorage?
     @ObservationIgnored private var pendingSave: Task<Void, Never>?
-    @ObservationIgnored private var terminationObserver: NSObjectProtocol?
+    @ObservationIgnored nonisolated(unsafe) private var terminationObserver: NSObjectProtocol?
+    @ObservationIgnored nonisolated(unsafe) private var resignObserver: NSObjectProtocol?
     @ObservationIgnored private var isTerminating = false
 
     private static let saveDelay: Duration = .milliseconds(500)
@@ -25,9 +28,10 @@ final class NotesStore {
         self.now = now
         self.storage = storage
         let createdAt = now()
-        let library = storage?.load()
+        let result = storage?.load() ?? .missing
 
-        if let library {
+        switch result {
+        case .loaded(let library):
             let repaired = Self.repaired(library.workspaces, now: createdAt)
             if repaired.isEmpty {
                 let workspace = Workspace.makeDefault(notes: notes, now: createdAt)
@@ -39,13 +43,20 @@ final class NotesStore {
                     ? library.selectedWorkspaceID
                     : repaired[0].id
             }
-        } else {
+            self.trash = library.trash
+        case .missing:
             let workspace = Workspace.makeDefault(notes: notes, now: createdAt)
             self.workspaces = [workspace]
             self.selectedWorkspaceID = workspace.id
+            self.trash = []
+        case .failure(let failure):
+            let workspace = Workspace.makeDefault(notes: notes, now: createdAt)
+            self.workspaces = [workspace]
+            self.selectedWorkspaceID = workspace.id
+            self.trash = []
+            self.loadFailure = failure
         }
 
-        self.trash = library?.trash ?? []
         markOpened(selectedID)
 
         if storage != nil {
@@ -58,7 +69,23 @@ final class NotesStore {
                     self.saveNow()
                 }
             }
+            resignObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didResignActiveNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.saveNow()
+                }
+            }
             scheduleSave()
+        }
+    }
+
+    deinit {
+        if let terminationObserver {
+            NotificationCenter.default.removeObserver(terminationObserver)
+        }
+        if let resignObserver {
+            NotificationCenter.default.removeObserver(resignObserver)
         }
     }
 
@@ -89,6 +116,40 @@ final class NotesStore {
     }
 
     var trashCount: Int { trash.count }
+
+    var hasStorageIssue: Bool { loadFailure != nil || saveError != nil }
+
+    var savesBlocked: Bool { loadFailure?.blocksSaving ?? false }
+
+    var storageIssueMessage: String {
+        if let loadFailure {
+            return loadFailure.message
+        }
+        if let saveError {
+            return "Blink couldn’t save your notes: \(saveError)"
+        }
+        return ""
+    }
+
+    var storageIssueURL: URL? {
+        loadFailure?.backupURL ?? loadFailure?.url ?? storage?.url
+    }
+
+    var notesURL: URL? { storage?.url }
+
+    func dismissStorageIssue() {
+        if saveError != nil {
+            saveError = nil
+        }
+        if let loadFailure, !loadFailure.blocksSaving {
+            self.loadFailure = nil
+        }
+    }
+
+    func retrySave() {
+        saveError = nil
+        saveNow()
+    }
 
     func selectWorkspace(_ id: Workspace.ID) {
         guard id != selectedWorkspaceID, workspaces.contains(where: { $0.id == id }) else { return }
@@ -308,14 +369,16 @@ final class NotesStore {
     func saveNow() {
         pendingSave?.cancel()
         pendingSave = nil
-        guard let storage else { return }
+        guard let storage, !savesBlocked else { return }
         do {
             try storage.save(LibrarySnapshot(
                 workspaces: workspaces,
                 selectedWorkspaceID: selectedWorkspaceID,
                 trash: trash
             ))
+            saveError = nil
         } catch {
+            saveError = error.localizedDescription
             Self.logger.error("Failed to save notes: \(error.localizedDescription, privacy: .public)")
         }
     }

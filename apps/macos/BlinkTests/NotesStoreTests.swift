@@ -95,6 +95,44 @@ struct NotesStoreTests {
     }
 
     @Test
+    func storeReportsUnreadableFilesAndBlocksSaving() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("notes.json")
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+
+        let store = NotesStore(
+            storage: NotesFileStorage(url: url),
+            now: { self.epoch }
+        )
+
+        #expect(store.loadFailure != nil)
+        #expect(store.savesBlocked)
+        #expect(store.hasStorageIssue)
+        #expect(store.notes.count == 1)
+    }
+
+    @Test
+    func corruptFileIsBackedUpAndTheAppCanStartFresh() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("notes.json")
+        try Data("not JSON".utf8).write(to: url)
+
+        let store = NotesStore(
+            storage: NotesFileStorage(url: url),
+            now: { self.epoch }
+        )
+
+        #expect(store.loadFailure != nil)
+        #expect(store.savesBlocked == false)
+        #expect(store.hasStorageIssue)
+
+        store.saveNow()
+        #expect(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    @Test
     func trashPersistsAcrossLaunches() throws {
         let directory = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

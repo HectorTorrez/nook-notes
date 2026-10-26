@@ -51,11 +51,11 @@ struct Note: Identifiable, Equatable, Sendable, Codable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
-        content = try container.decode(String.self, forKey: .content)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        content = try container.decodeIfPresent(String.self, forKey: .content) ?? ""
         richTextData = try container.decodeIfPresent(Data.self, forKey: .richTextData)
-        createdAt = try container.decode(Date.self, forKey: .createdAt)
-        modifiedAt = try container.decode(Date.self, forKey: .modifiedAt)
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        modifiedAt = try container.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? createdAt
         lastOpenedAt = try container.decodeIfPresent(Date.self, forKey: .lastOpenedAt) ?? modifiedAt
         isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
     }
