@@ -110,6 +110,18 @@ enum ListStyle: String, CaseIterable, Identifiable {
     }
 }
 
+/// Normalizes link text so links always have a scheme.
+enum RichTextLink {
+    static func normalized(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else { return nil }
+        if let url = URL(string: trimmed), url.scheme != nil {
+            return trimmed
+        }
+        return "https://\(trimmed)"
+    }
+}
+
 /// Builds the concrete font for a run from its formatting flags.
 enum RichTextFont {
     static func make(
