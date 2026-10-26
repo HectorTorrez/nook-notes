@@ -105,7 +105,18 @@ final class RichTextController {
                 attributes.removeValue(forKey: .blinkHeading)
             }
             attributes[.font] = font(for: attributes)
+
+            let paragraphStyle = NSMutableParagraphStyle()
+            if let existing = attributes[.paragraphStyle] as? NSParagraphStyle {
+                paragraphStyle.setParagraphStyle(existing)
+            }
+            paragraphStyle.lineSpacing = NotesTextEditor.lineSpacing
+            applyHeadingSpacing(target, to: paragraphStyle)
+            attributes[.paragraphStyle] = paragraphStyle
+
+            textView.defaultParagraphStyle = paragraphStyle
             textView.typingAttributes = attributes
+            (textView as? NotesTextView)?.pendingParagraphStyle = paragraphStyle
             heading = target
             refresh()
             return
@@ -117,6 +128,9 @@ final class RichTextController {
             } else {
                 storage.removeAttribute(.blinkHeading, range: range)
             }
+            let style = self.mutableParagraphStyle(at: range, storage: storage)
+            self.applyHeadingSpacing(target, to: style)
+            storage.addAttribute(.paragraphStyle, value: style, range: range)
             self.rewriteFonts(in: range, storage: storage)
         }
     }
@@ -327,6 +341,32 @@ final class RichTextController {
         }
     }
 
+    /// Removes character and paragraph styles from the selection, or from the
+    /// paragraph at the caret.
+    func clearFormatting() {
+        guard let textView, let storage = textView.textStorage else { return }
+        let base = baseTypingAttributes()
+
+        guard storage.length > 0 else {
+            textView.typingAttributes = base
+            textView.defaultParagraphStyle = base[.paragraphStyle] as? NSParagraphStyle
+            (textView as? NotesTextView)?.pendingParagraphStyle =
+                base[.paragraphStyle] as? NSParagraphStyle
+            refresh()
+            return
+        }
+
+        let range = hasSelection ? textView.selectedRange() : paragraphRange(in: storage)
+        applyEdit(in: range, actionName: "Clear Formatting") { storage, range in
+            let paragraphs = (storage.string as NSString).paragraphRange(for: range)
+            storage.setAttributes(base, range: range)
+
+            let style = NSMutableParagraphStyle()
+            style.lineSpacing = NotesTextEditor.lineSpacing
+            storage.addAttribute(.paragraphStyle, value: style, range: paragraphs)
+        }
+    }
+
     /// Adds or removes a link on the current selection. Returns `false` when
     /// there is no selection, since a link needs text to attach to.
     @discardableResult
@@ -508,9 +548,30 @@ final class RichTextController {
             let range = NSRange(location: 0, length: storage.length)
             storage.beginEditing()
             rewriteFonts(in: range, storage: storage)
+            normalizeParagraphStyles(storage: storage)
             storage.endEditing()
         }
         syncTypingAttributes()
+    }
+
+    /// Applies heading spacing to every paragraph so notes saved before spacing
+    /// existed pick it up on load.
+    private func normalizeParagraphStyles(storage: NSTextStorage) {
+        let text = storage.string as NSString
+        var location = 0
+        while location < storage.length {
+            let paragraph = text.paragraphRange(for: NSRange(location: location, length: 0))
+            guard paragraph.length > 0 else { break }
+            let level = (storage.attribute(
+                .blinkHeading,
+                at: paragraph.location,
+                effectiveRange: nil
+            ) as? Int).flatMap(HeadingLevel.init(rawValue:))
+            let style = mutableParagraphStyle(at: paragraph, storage: storage)
+            applyHeadingSpacing(level, to: style)
+            storage.addAttribute(.paragraphStyle, value: style, range: paragraph)
+            location = NSMaxRange(paragraph)
+        }
     }
 
     private func mutableParagraphStyle(at range: NSRange, storage: NSTextStorage) -> NSMutableParagraphStyle {
@@ -521,6 +582,11 @@ final class RichTextController {
         }
         style.lineSpacing = NotesTextEditor.lineSpacing
         return style
+    }
+
+    private func applyHeadingSpacing(_ level: HeadingLevel?, to style: NSMutableParagraphStyle) {
+        style.paragraphSpacingBefore = level?.paragraphSpacingBefore ?? 0
+        style.paragraphSpacing = level?.paragraphSpacing ?? 0
     }
 
     private func applyIndentation(
@@ -622,6 +688,8 @@ final class RichTextController {
             style.setParagraphStyle(existing)
         }
         style.lineSpacing = NotesTextEditor.lineSpacing
+        let level = (attributes[.blinkHeading] as? Int).flatMap(HeadingLevel.init(rawValue:))
+        applyHeadingSpacing(level, to: style)
         normalized[.paragraphStyle] = style
         return normalized
     }

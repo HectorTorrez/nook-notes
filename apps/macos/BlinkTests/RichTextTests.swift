@@ -229,6 +229,99 @@ struct RichTextTests {
     }
 
     @Test
+    func headingSpacingIsAppliedAndRemoved() throws {
+        let textView = makeTextView("Title")
+        let controller = RichTextController()
+        controller.baseFontSize = 16
+        controller.attach(textView)
+        controller.selectionDidChange()
+
+        controller.setHeading(.heading1)
+        let storage = try #require(textView.textStorage)
+        let headingStyle = try #require(
+            storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        )
+        #expect(headingStyle.paragraphSpacingBefore == HeadingLevel.heading1.paragraphSpacingBefore)
+        #expect(headingStyle.paragraphSpacing == HeadingLevel.heading1.paragraphSpacing)
+
+        controller.setHeading(.heading1)
+        let bodyStyle = try #require(
+            storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        )
+        #expect(bodyStyle.paragraphSpacingBefore == 0)
+        #expect(bodyStyle.paragraphSpacing == 0)
+    }
+
+    @Test
+    func restyleAddsSpacingToExistingHeadings() throws {
+        let source = NSMutableAttributedString(string: "Existing heading")
+        let fullRange = NSRange(location: 0, length: source.length)
+        source.addAttribute(.font, value: NSFont.systemFont(ofSize: 16), range: fullRange)
+        source.addAttribute(
+            .blinkHeading,
+            value: HeadingLevel.heading2.rawValue,
+            range: fullRange
+        )
+
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        textView.textStorage?.setAttributedString(source)
+        let controller = RichTextController()
+        controller.baseFontSize = 16
+        controller.attach(textView)
+        controller.restyleFonts()
+
+        let storage = try #require(textView.textStorage)
+        let style = try #require(
+            storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        )
+        #expect(style.paragraphSpacingBefore == HeadingLevel.heading2.paragraphSpacingBefore)
+        #expect(style.paragraphSpacing == HeadingLevel.heading2.paragraphSpacing)
+    }
+
+    @Test
+    func clearFormattingRemovesCharacterAndParagraphStyles() throws {
+        let textView = makeTextView("Plain")
+        let controller = RichTextController()
+        controller.baseFontSize = 16
+        controller.attach(textView)
+        controller.selectionDidChange()
+
+        controller.setHeading(.heading2)
+        textView.setSelectedRange(NSRange(location: 0, length: 5))
+        controller.selectionDidChange()
+        controller.toggleBold()
+        controller.clearFormatting()
+
+        let storage = try #require(textView.textStorage)
+        let font = try #require(storage.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+        let style = try #require(
+            storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        )
+
+        #expect(storage.attribute(.blinkHeading, at: 0, effectiveRange: nil) == nil)
+        #expect(NSFontManager.shared.traits(of: font).contains(.boldFontMask) == false)
+        #expect(font.pointSize == 16)
+        #expect(style.paragraphSpacing == 0)
+        #expect(style.paragraphSpacingBefore == 0)
+        #expect(style.textLists.isEmpty)
+        #expect(style.lineSpacing == NotesTextEditor.lineSpacing)
+    }
+
+    @Test
+    func clearFormattingResetsAnEmptyNote() {
+        let textView = makeTextView("")
+        let controller = RichTextController()
+        controller.baseFontSize = 16
+        controller.attach(textView)
+
+        controller.setHeading(.heading1)
+        controller.clearFormatting()
+
+        #expect(textView.typingAttributes[.blinkHeading] == nil)
+        #expect(textView.defaultParagraphStyle?.paragraphSpacingBefore == 0)
+    }
+
+    @Test
     func emptyDocumentCanStartAList() throws {
         let window = makeWindow()
         let textView = NotesTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))

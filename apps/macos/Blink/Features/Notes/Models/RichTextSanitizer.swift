@@ -118,14 +118,16 @@ enum RichTextSanitizer {
 
         result[.paragraphStyle] = sanitizedParagraphStyle(
             attributes[.paragraphStyle] as? NSParagraphStyle,
-            isQuote: isQuote
+            isQuote: isQuote,
+            level: level
         )
         return result
     }
 
     private static func sanitizedParagraphStyle(
         _ existing: NSParagraphStyle?,
-        isQuote: Bool
+        isQuote: Bool,
+        level: HeadingLevel?
     ) -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
         if let existing {
@@ -134,8 +136,8 @@ enum RichTextSanitizer {
 
         style.lineSpacing = NotesTextEditor.lineSpacing
         style.lineHeightMultiple = 1
-        style.paragraphSpacing = 0
-        style.paragraphSpacingBefore = 0
+        style.paragraphSpacing = level?.paragraphSpacing ?? 0
+        style.paragraphSpacingBefore = level?.paragraphSpacingBefore ?? 0
 
         let hasList = !style.textLists.isEmpty
         let listIndent: CGFloat = hasList ? 22 : 0

@@ -79,6 +79,10 @@ struct NoteCommands: Commands {
             .keyboardShortcut("k", modifiers: [.command, .control])
             .disabled(format?.isChecklist != true)
 
+        Button("Clear Formatting") { format?.clearFormatting() }
+            .keyboardShortcut("c", modifiers: [.command, .option])
+            .disabled(format == nil)
+
         Divider()
 
         Button("Increase Indent") { format?.adjustIndent(by: 22) }
