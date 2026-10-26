@@ -9,6 +9,7 @@ struct NotesView: View {
     @State private var isHovering = false
     @State private var isWorkspaceHovering = false
     @State private var isFormatBarPinned = false
+    @State private var isFormatBarDismissedForSelection = false
     @State private var titleBarHeight: CGFloat = 40
     @State private var formatController = RichTextController()
     @AppStorage("fontSize") private var fontSize: Double = 16
@@ -48,7 +49,10 @@ struct NotesView: View {
     /// The formatting bar shows while text is selected (when enabled) or when
     /// pinned open from the letter button.
     private var showsFormatBar: Bool {
-        isFormatBarPinned || (formatController.hasSelection && showsFormatBarOnSelection)
+        isFormatBarPinned
+            || (formatController.hasSelection
+                && showsFormatBarOnSelection
+                && !isFormatBarDismissedForSelection)
     }
 
     private var editorPreferences: EditorPreferences {
@@ -106,6 +110,9 @@ struct NotesView: View {
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: showsControls)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: showsFormatBar)
+        .onChange(of: formatController.selectionRevision) {
+            isFormatBarDismissedForSelection = false
+        }
         .navigationTitle(note.title)
         .focusedSceneValue(\.notesCommandHandler, NotesCommandHandler(
             perform: perform,
@@ -302,7 +309,10 @@ struct NotesView: View {
 
     private var textOptionsButton: some View {
         Button {
-            withAnimation(.easeOut(duration: 0.18)) { isFormatBarPinned = true }
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
+                isFormatBarPinned = true
+                isFormatBarDismissedForSelection = false
+            }
         } label: {
             Image(systemName: "textformat")
                 .font(.system(size: 13, weight: .semibold))
@@ -317,7 +327,7 @@ struct NotesView: View {
 
     private func dismissFormatBar() {
         isFormatBarPinned = false
-        formatController.dismiss()
+        isFormatBarDismissedForSelection = true
     }
 
     /// Escape clears the selection and unpins the bar, but only while it is shown

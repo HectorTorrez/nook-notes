@@ -22,6 +22,7 @@ final class RichTextController {
     private(set) var listStyle: ListStyle?
     private(set) var alignment: NSTextAlignment = .natural
     private(set) var link: String?
+    private(set) var selectionRevision = 0
 
     /// A task list can be toggled between its empty and checked markers.
     var isChecklist: Bool { listStyle == .task }
@@ -61,6 +62,7 @@ final class RichTextController {
     /// Called when the selection changes so typing attributes are rebuilt from
     /// the character next to the caret instead of carrying a stale style.
     func selectionDidChange() {
+        selectionRevision += 1
         syncTypingAttributes()
         refresh()
     }
@@ -774,14 +776,6 @@ final class RichTextController {
         let item = NSMenuItem()
         item.tag = Int(action.rawValue)
         textView.performFindPanelAction(item)
-    }
-
-    /// Drops the selection so the formatting bar can collapse.
-    func dismiss() {
-        guard let textView else { return }
-        let selection = textView.selectedRange()
-        textView.setSelectedRange(NSRange(location: selection.location + selection.length, length: 0))
-        hasSelection = false
     }
 
 }
