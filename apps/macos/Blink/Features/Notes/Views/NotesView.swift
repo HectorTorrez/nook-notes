@@ -14,6 +14,21 @@ struct NotesView: View {
     @AppStorage("fontSize") private var fontSize: Double = 16
     @AppStorage("backgroundOpacity") private var backgroundOpacity: Double = 0.75
     @AppStorage(Theme.accentPaletteKey) private var accentPalette: AccentPalette = Theme.defaultAccentPalette
+    @AppStorage(EditorSettings.fontFamilyKey) private var fontFamily: EditorFontFamily = .system
+    @AppStorage(EditorSettings.spellCheckingKey)
+    private var checksSpelling = EditorSettings.checksSpellingDefault
+    @AppStorage(EditorSettings.spellingCorrectionKey)
+    private var correctsSpelling = EditorSettings.correctsSpellingDefault
+    @AppStorage(EditorSettings.smartQuotesKey)
+    private var usesSmartQuotes = EditorSettings.smartQuotesDefault
+    @AppStorage(EditorSettings.smartDashesKey)
+    private var usesSmartDashes = EditorSettings.smartDashesDefault
+    @AppStorage(EditorSettings.textReplacementKey)
+    private var usesTextReplacement = EditorSettings.textReplacementDefault
+    @AppStorage(EditorSettings.linkDetectionKey)
+    private var detectsLinks = EditorSettings.detectsLinksDefault
+    @AppStorage(EditorSettings.formatBarOnSelectionKey)
+    private var showsFormatBarOnSelection = EditorSettings.showsFormatBarOnSelectionDefault
 
     /// Clears the traffic lights on the leading edge of the title bar.
     private static let trafficLightsWidth: CGFloat = 86
@@ -27,9 +42,23 @@ struct NotesView: View {
         isHovering || panel != nil
     }
 
-    /// The formatting bar shows while text is selected or when pinned open from the letter button.
+    /// The formatting bar shows while text is selected (when enabled) or when
+    /// pinned open from the letter button.
     private var showsFormatBar: Bool {
-        formatController.hasSelection || isFormatBarPinned
+        isFormatBarPinned || (formatController.hasSelection && showsFormatBarOnSelection)
+    }
+
+    private var editorPreferences: EditorPreferences {
+        EditorPreferences(
+            fontFamily: fontFamily,
+            checksSpelling: checksSpelling,
+            correctsSpelling: correctsSpelling,
+            usesSmartQuotes: usesSmartQuotes,
+            usesSmartDashes: usesSmartDashes,
+            usesTextReplacement: usesTextReplacement,
+            detectsLinks: detectsLinks,
+            showsFormatBarOnSelection: showsFormatBarOnSelection
+        )
     }
 
     var body: some View {
@@ -39,6 +68,7 @@ struct NotesView: View {
                 text: note.content,
                 richTextData: note.richTextData,
                 fontSize: fontSize,
+                preferences: editorPreferences,
                 caretColor: accent,
                 controller: formatController,
                 onChange: { store.updateSelectedContent($0, richTextData: $1) },

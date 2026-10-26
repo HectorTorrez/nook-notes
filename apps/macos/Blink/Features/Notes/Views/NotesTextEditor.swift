@@ -6,6 +6,7 @@ struct NotesTextEditor: NSViewRepresentable {
     var text: String
     var richTextData: Data?
     var fontSize: CGFloat
+    var preferences: EditorPreferences
     var caretColor: Color
     var controller: RichTextController
     var onChange: (String, Data?) -> Void
@@ -17,11 +18,14 @@ struct NotesTextEditor: NSViewRepresentable {
     static let topInset: CGFloat = 6
     static let lineSpacing: CGFloat = 6
 
-    static func baseAttributes(fontSize: CGFloat) -> [NSAttributedString.Key: Any] {
+    static func baseAttributes(
+        fontSize: CGFloat,
+        family: EditorFontFamily = .system
+    ) -> [NSAttributedString.Key: Any] {
         let style = NSMutableParagraphStyle()
         style.lineSpacing = lineSpacing
         return [
-            .font: NSFont.systemFont(ofSize: fontSize),
+            .font: family.font(size: fontSize, bold: false),
             .foregroundColor: NSColor.labelColor,
             .paragraphStyle: style,
         ]
@@ -60,10 +64,6 @@ struct NotesTextEditor: NSViewRepresentable {
         textView.focusRingType = .none
         textView.textContainerInset = NSSize(width: Self.horizontalInset, height: Self.topInset)
         textView.textContainer?.lineFragmentPadding = 0
-        textView.isAutomaticQuoteSubstitutionEnabled = false
-        textView.isAutomaticDashSubstitutionEnabled = false
-        textView.isAutomaticTextReplacementEnabled = false
-        textView.isAutomaticLinkDetectionEnabled = false
         textView.isAutomaticDataDetectionEnabled = false
         textView.insertionPointColor = NSColor(caretColor)
         textView.linkTextAttributes = [
@@ -77,9 +77,12 @@ struct NotesTextEditor: NSViewRepresentable {
             coordinator?.parent.onEscape() ?? false
         }
 
+        applyPreferences(to: textView)
         context.coordinator.noteID = noteID
         context.coordinator.appliedFontSize = fontSize
+        context.coordinator.appliedFontFamily = preferences.fontFamily
         controller.baseFontSize = fontSize
+        controller.fontFamily = preferences.fontFamily
         controller.attach(textView)
         context.coordinator.loadContent(into: textView)
         controller.restyleFonts()
@@ -98,22 +101,36 @@ struct NotesTextEditor: NSViewRepresentable {
         coordinator.parent = self
 
         textView.insertionPointColor = NSColor(caretColor)
+        applyPreferences(to: textView)
         controller.baseFontSize = fontSize
+        controller.fontFamily = preferences.fontFamily
 
         if coordinator.noteID != noteID {
             coordinator.noteID = noteID
             coordinator.appliedFontSize = fontSize
+            coordinator.appliedFontFamily = preferences.fontFamily
             coordinator.loadContent(into: textView)
             controller.restyleFonts()
             textView.undoManager?.removeAllActions()
             textView.setSelectedRange(NSRange(location: 0, length: 0))
             textView.scrollToBeginningOfDocument(nil)
             textView.window?.makeFirstResponder(textView)
-            controller.refresh()
-        } else if coordinator.appliedFontSize != fontSize {
+            controller.selectionDidChange()
+        } else if coordinator.appliedFontSize != fontSize
+            || coordinator.appliedFontFamily != preferences.fontFamily {
             coordinator.appliedFontSize = fontSize
+            coordinator.appliedFontFamily = preferences.fontFamily
             controller.restyleFonts()
         }
+    }
+
+    private func applyPreferences(to textView: NSTextView) {
+        textView.isContinuousSpellCheckingEnabled = preferences.checksSpelling
+        textView.isAutomaticSpellingCorrectionEnabled = preferences.correctsSpelling
+        textView.isAutomaticQuoteSubstitutionEnabled = preferences.usesSmartQuotes
+        textView.isAutomaticDashSubstitutionEnabled = preferences.usesSmartDashes
+        textView.isAutomaticTextReplacementEnabled = preferences.usesTextReplacement
+        textView.isAutomaticLinkDetectionEnabled = preferences.detectsLinks
     }
 
     @MainActor
@@ -121,6 +138,7 @@ struct NotesTextEditor: NSViewRepresentable {
         var parent: NotesTextEditor
         var noteID: Note.ID?
         var appliedFontSize: CGFloat = 0
+        var appliedFontFamily: EditorFontFamily = .system
 
         init(_ parent: NotesTextEditor) {
             self.parent = parent
@@ -167,7 +185,10 @@ struct NotesTextEditor: NSViewRepresentable {
         }
 
         private var baseAttributes: [NSAttributedString.Key: Any] {
-            NotesTextEditor.baseAttributes(fontSize: parent.fontSize)
+            NotesTextEditor.baseAttributes(
+                fontSize: parent.fontSize,
+                family: parent.preferences.fontFamily
+            )
         }
 
         private func applyBaseTypography(to textView: NSTextView) {
