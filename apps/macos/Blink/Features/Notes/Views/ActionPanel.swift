@@ -40,7 +40,7 @@ struct ActionPanel: View {
     private func isEnabled(_ action: NoteAction) -> Bool {
         switch action {
         case .restoreLastDeleted: store.lastDeleted != nil
-        case .copyNote: !store.selectedNote.isEmpty
+        case .copyNote, .copyAsMarkdown: !store.selectedNote.isEmpty
         case .newNote, .switchWorkspace, .browseNotes, .deleteNote: true
         }
     }

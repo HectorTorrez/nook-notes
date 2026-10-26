@@ -6,6 +6,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
     case switchWorkspace
     case browseNotes
     case copyNote
+    case copyAsMarkdown
     case deleteNote
     case restoreLastDeleted
 
@@ -17,6 +18,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
         case .switchWorkspace: "Workspaces"
         case .browseNotes: "Browse Notes"
         case .copyNote: "Copy Note"
+        case .copyAsMarkdown: "Copy as Markdown"
         case .deleteNote: "Delete Note"
         case .restoreLastDeleted: "Restore Last Deleted"
         }
@@ -28,6 +30,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
         case .switchWorkspace: "square.stack.3d.up.fill"
         case .browseNotes: "square.stack.fill"
         case .copyNote: "doc.on.doc.fill"
+        case .copyAsMarkdown: "doc.plaintext"
         case .deleteNote: "trash.fill"
         case .restoreLastDeleted: "arrow.uturn.backward"
         }
@@ -39,6 +42,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
         case .switchWorkspace: .purple
         case .browseNotes: .blue
         case .copyNote: .teal
+        case .copyAsMarkdown: .mint
         case .deleteNote: .red
         case .restoreLastDeleted: .indigo
         }
@@ -50,6 +54,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
         case .switchWorkspace: KeyboardShortcut("o", modifiers: [.command, .shift])
         case .browseNotes: KeyboardShortcut("p")
         case .copyNote: KeyboardShortcut("c", modifiers: [.command, .shift])
+        case .copyAsMarkdown: KeyboardShortcut("m", modifiers: [.command, .shift])
         case .deleteNote: KeyboardShortcut(.delete, modifiers: [.command, .shift])
         case .restoreLastDeleted: nil
         }
@@ -61,6 +66,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
         case .switchWorkspace: ["⇧", "⌘", "O"]
         case .browseNotes: ["⌘", "P"]
         case .copyNote: ["⇧", "⌘", "C"]
+        case .copyAsMarkdown: ["⇧", "⌘", "M"]
         case .deleteNote: ["⇧", "⌘", "⌫"]
         case .restoreLastDeleted: []
         }
@@ -85,9 +91,34 @@ extension FocusedValues {
 }
 
 extension Note {
-    func copyToPasteboard() {
-        let pasteboard = NSPasteboard.general
+    func copyToPasteboard(_ pasteboard: NSPasteboard = .general) {
         pasteboard.clearContents()
         pasteboard.setString(content, forType: .string)
+
+        guard let richTextData,
+              let attributed = RichTextCoding.attributedString(from: richTextData),
+              attributed.length > 0 else {
+            return
+        }
+
+        let range = NSRange(location: 0, length: attributed.length)
+        if let rtf = try? attributed.data(
+            from: range,
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+        ) {
+            pasteboard.setData(rtf, forType: .rtf)
+        }
+        if let html = try? attributed.data(
+            from: range,
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.html]
+        ) {
+            pasteboard.setData(html, forType: .html)
+        }
+        pasteboard.setData(richTextData, forType: .blinkRichText)
+    }
+
+    func copyMarkdownToPasteboard(_ pasteboard: NSPasteboard = .general) {
+        pasteboard.clearContents()
+        pasteboard.setString(markdown, forType: .string)
     }
 }
