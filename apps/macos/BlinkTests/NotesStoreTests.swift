@@ -95,6 +95,82 @@ struct NotesStoreTests {
     }
 
     @Test
+    func trashPersistsAcrossLaunches() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storage = NotesFileStorage(url: directory.appendingPathComponent("notes.json"))
+
+        let store = NotesStore(storage: storage, now: { self.epoch })
+        store.updateSelectedContent("Persisted trash", richTextData: nil)
+        store.deleteNote(store.selectedID)
+        store.saveNow()
+
+        let reloaded = NotesStore(storage: storage, now: { self.epoch })
+        #expect(reloaded.trashCount == 1)
+        #expect(reloaded.lastDeleted?.content == "Persisted trash")
+        #expect(reloaded.trash.first?.workspaceName == Workspace.defaultName)
+    }
+
+    @Test
+    func restoreReturnsANoteToItsOriginalWorkspace() throws {
+        let store = NotesStore(now: { self.epoch })
+        let personalID = store.selectedWorkspaceID
+
+        #expect(store.createWorkspace(named: "Work"))
+        let workID = store.selectedWorkspaceID
+        store.updateSelectedContent("Work note", richTextData: nil)
+        store.deleteNote(store.selectedID)
+
+        store.selectWorkspace(personalID)
+        let entry = try #require(store.trash.last)
+        store.restore(entry.id)
+
+        #expect(store.selectedWorkspaceID == workID)
+        #expect(store.selectedNote.content == "Work note")
+        #expect(store.trash.isEmpty)
+    }
+
+    @Test
+    func deletingAWorkspaceMovesItsNotesToTrash() throws {
+        let store = NotesStore(now: { self.epoch })
+        let personalID = store.selectedWorkspaceID
+
+        #expect(store.createWorkspace(named: "Work"))
+        let workID = store.selectedWorkspaceID
+        store.updateSelectedContent("Work note", richTextData: nil)
+
+        store.deleteWorkspace(workID)
+
+        #expect(store.trashCount == 1)
+        #expect(store.lastDeleted?.content == "Work note")
+
+        // The original workspace is gone, so the note returns to the active one.
+        store.restoreLastDeleted()
+
+        #expect(store.selectedWorkspaceID == personalID)
+        #expect(store.selectedNote.content == "Work note")
+    }
+
+    @Test
+    func trashCanBeEmptiedOrDeletedPermanently() throws {
+        let store = NotesStore(now: { self.epoch })
+
+        store.updateSelectedContent("One", richTextData: nil)
+        store.deleteNote(store.selectedID)
+        store.updateSelectedContent("Two", richTextData: nil)
+        store.deleteNote(store.selectedID)
+
+        #expect(store.trashCount == 2)
+        let firstEntry = try #require(store.trash.first)
+        store.deletePermanently(firstEntry.id)
+        #expect(store.trashCount == 1)
+
+        store.emptyTrash()
+        #expect(store.trash.isEmpty)
+        #expect(store.lastDeleted == nil)
+    }
+
+    @Test
     func importNotesReplacesTheEmptySelectedNoteAndSelectsTheFirstImport() {
         let store = NotesStore(now: { self.epoch })
         let first = Note(content: "Imported one", createdAt: epoch)
@@ -134,5 +210,12 @@ struct NotesStoreTests {
         #expect(store.canDeleteWorkspace == false)
         store.deleteWorkspace(onlyWorkspace)
         #expect(store.workspaces.count == 1)
+    }
+
+    private func makeTemporaryDirectory() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BlinkStoreTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
     }
 }

@@ -143,7 +143,7 @@ struct WorkspacesPanel: View {
 
     private func deleteTooltip(for workspace: Workspace) -> some View {
         HStack(spacing: 8) {
-            Text("Delete \(workspace.name)?")
+            Text("Delete \(workspace.name) and \(workspace.noteCountLabel)?")
                 .lineLimit(1)
             Button("Cancel") { pendingDeleteID = nil }
                 .foregroundStyle(.white.opacity(0.72))

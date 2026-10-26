@@ -9,6 +9,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
     case copyAsMarkdown
     case deleteNote
     case restoreLastDeleted
+    case trash
 
     var id: Self { self }
 
@@ -21,6 +22,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
         case .copyAsMarkdown: "Copy as Markdown"
         case .deleteNote: "Delete Note"
         case .restoreLastDeleted: "Restore Last Deleted"
+        case .trash: "Trash"
         }
     }
 
@@ -33,6 +35,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
         case .copyAsMarkdown: "doc.plaintext"
         case .deleteNote: "trash.fill"
         case .restoreLastDeleted: "arrow.uturn.backward"
+        case .trash: "trash"
         }
     }
 
@@ -45,6 +48,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
         case .copyAsMarkdown: .mint
         case .deleteNote: .red
         case .restoreLastDeleted: .indigo
+        case .trash: .gray
         }
     }
 
@@ -57,6 +61,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
         case .copyAsMarkdown: KeyboardShortcut("m", modifiers: [.command, .shift])
         case .deleteNote: KeyboardShortcut(.delete, modifiers: [.command, .shift])
         case .restoreLastDeleted: nil
+        case .trash: KeyboardShortcut("t", modifiers: [.command, .option])
         }
     }
 
@@ -69,6 +74,7 @@ enum NoteAction: String, CaseIterable, Identifiable {
         case .copyAsMarkdown: ["⇧", "⌘", "M"]
         case .deleteNote: ["⇧", "⌘", "⌫"]
         case .restoreLastDeleted: []
+        case .trash: ["⌥", "⌘", "T"]
         }
     }
 }
@@ -77,6 +83,7 @@ enum NotesPanel {
     case actions
     case notes
     case workspaces
+    case trash
 }
 
 /// Routes menu-bar commands to the key notes window.

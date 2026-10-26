@@ -43,10 +43,16 @@ struct Workspace: Identifiable, Equatable, Sendable, Codable {
 struct LibrarySnapshot: Codable, Equatable, Sendable {
     var workspaces: [Workspace]
     var selectedWorkspaceID: Workspace.ID
+    var trash: [TrashedNote]
 
-    init(workspaces: [Workspace], selectedWorkspaceID: Workspace.ID) {
+    init(
+        workspaces: [Workspace],
+        selectedWorkspaceID: Workspace.ID,
+        trash: [TrashedNote] = []
+    ) {
         self.workspaces = workspaces
         self.selectedWorkspaceID = selectedWorkspaceID
+        self.trash = trash
     }
 
     /// Existing single-list saves become one workspace named Personal.
@@ -58,5 +64,22 @@ struct LibrarySnapshot: Codable, Equatable, Sendable {
         }
         workspaces = [migrated]
         selectedWorkspaceID = migrated.id
+        trash = []
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case workspaces
+        case selectedWorkspaceID
+        case trash
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        workspaces = try container.decode([Workspace].self, forKey: .workspaces)
+        selectedWorkspaceID = try container.decode(
+            Workspace.ID.self,
+            forKey: .selectedWorkspaceID
+        )
+        trash = try container.decodeIfPresent([TrashedNote].self, forKey: .trash) ?? []
     }
 }
