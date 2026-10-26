@@ -21,6 +21,7 @@ private struct AppearanceSettingsView: View {
     @AppStorage("backgroundOpacity") private var backgroundOpacity: Double = 0.75
     @AppStorage("alwaysOnTop") private var alwaysOnTop = true
     @AppStorage(EditorSettings.fontFamilyKey) private var fontFamily: EditorFontFamily = .system
+    @State private var launchesAtLogin = LaunchAtLogin.isEnabled
 
     var body: some View {
         Form {
@@ -42,6 +43,17 @@ private struct AppearanceSettingsView: View {
 
             Section("Window") {
                 Toggle("Float above other apps", isOn: $alwaysOnTop)
+                Toggle("Launch at login", isOn: $launchesAtLogin)
+                    .onChange(of: launchesAtLogin) { _, enabled in
+                        do {
+                            try LaunchAtLogin.set(enabled)
+                        } catch {
+                            launchesAtLogin = LaunchAtLogin.isEnabled
+                        }
+                    }
+                Text("Global shortcut: ⌃⌥B")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
             }
 
             Section("Background") {
