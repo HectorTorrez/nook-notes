@@ -81,6 +81,7 @@ struct NotesTextEditor: NSViewRepresentable {
 
         textView.baseFontSize = fontSize
         textView.fontFamily = preferences.fontFamily
+        textView.richTextController = controller
         applyPreferences(to: textView)
         context.coordinator.noteID = noteID
         context.coordinator.appliedFontSize = fontSize
@@ -107,6 +108,7 @@ struct NotesTextEditor: NSViewRepresentable {
         textView.insertionPointColor = NSColor(caretColor)
         textView.baseFontSize = fontSize
         textView.fontFamily = preferences.fontFamily
+        textView.richTextController = controller
         applyPreferences(to: textView)
         controller.baseFontSize = fontSize
         controller.fontFamily = preferences.fontFamily
@@ -115,6 +117,7 @@ struct NotesTextEditor: NSViewRepresentable {
             coordinator.noteID = noteID
             coordinator.appliedFontSize = fontSize
             coordinator.appliedFontFamily = preferences.fontFamily
+            textView.pendingParagraphStyle = nil
             coordinator.loadContent(into: textView)
             controller.restyleFonts()
             textView.undoManager?.removeAllActions()
@@ -212,12 +215,42 @@ struct NotesTextEditor: NSViewRepresentable {
 /// reaches the document.
 final class NotesTextView: NSTextView {
     var onCancel: (() -> Bool)?
+    weak var richTextController: RichTextController?
     var baseFontSize: CGFloat = 16
     var fontFamily: EditorFontFamily = .system
+    /// Paragraph style chosen for an empty note, applied once text is typed.
+    var pendingParagraphStyle: NSParagraphStyle?
 
     override func cancelOperation(_ sender: Any?) {
         if onCancel?() == true { return }
         super.cancelOperation(sender)
+    }
+
+    override func insertText(_ insertString: Any, replacementRange: NSRange) {
+        if insertString as? String == " ",
+           replacementRange.length == 0,
+           applyMarkdownPrefix() {
+            return
+        }
+        super.insertText(insertString, replacementRange: replacementRange)
+        applyPendingParagraphStyle()
+    }
+
+    override func keyDown(with event: NSEvent) {
+        let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        if event.keyCode == 48,
+           (modifiers.isEmpty || modifiers == .shift),
+           let controller = richTextController,
+           controller.canAdjustIndent {
+            controller.adjustIndent(by: modifiers == .shift ? -22 : 22)
+            return
+        }
+        super.keyDown(with: event)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if toggleChecklistIfNeeded(event) { return }
+        super.mouseDown(with: event)
     }
 
     override func paste(_ sender: Any?) {
@@ -260,6 +293,137 @@ final class NotesTextView: NSTextView {
         }
         sanitize(NSRange(location: before.location, length: insertedLength))
         return didRead
+    }
+
+    /// Turns Markdown block prefixes (`# `, `- `, `1. `, `[] `) into rich text
+    /// when the user types the trailing space.
+    private func applyMarkdownPrefix() -> Bool {
+        guard let controller = richTextController else { return false }
+        let selection = selectedRange()
+        guard selection.length == 0 else { return false }
+
+        let nsString = string as NSString
+        guard nsString.length > 0 else { return false }
+        let paragraph = nsString.paragraphRange(
+            for: NSRange(location: selection.location, length: 0)
+        )
+        let prefixLength = selection.location - paragraph.location
+        guard prefixLength > 0, prefixLength <= 10 else { return false }
+
+        let prefix = nsString.substring(
+            with: NSRange(location: paragraph.location, length: prefixLength)
+        )
+        guard let transform = MarkdownPrefix(prefix) else { return false }
+
+        var textEnd = NSMaxRange(paragraph)
+        if textEnd > paragraph.location, nsString.character(at: textEnd - 1) == 10 {
+            textEnd -= 1
+        }
+        guard selection.location == textEnd else { return false }
+
+        guard let storage = textStorage, paragraph.location < storage.length else { return false }
+        if let style = storage.attribute(
+            .paragraphStyle,
+            at: paragraph.location,
+            effectiveRange: nil
+        ) as? NSParagraphStyle, !style.textLists.isEmpty {
+            return false
+        }
+        if storage.attribute(.blinkHeading, at: paragraph.location, effectiveRange: nil) != nil {
+            return false
+        }
+
+        undoManager?.beginUndoGrouping()
+        insertText("", replacementRange: NSRange(location: paragraph.location, length: prefixLength))
+        setSelectedRange(NSRange(location: paragraph.location, length: 0))
+        switch transform {
+        case .heading(let level):
+            controller.setHeading(level)
+        case .list(let style):
+            controller.setList(style)
+        }
+        undoManager?.endUndoGrouping()
+        undoManager?.setActionName("Markdown Style")
+        return true
+    }
+
+    /// Clicking the marker gutter of a task-list item checks or unchecks it.
+    /// Applies a paragraph style chosen while the note was empty to the first
+    /// text that is typed into it.
+    private func applyPendingParagraphStyle() {
+        guard let style = pendingParagraphStyle,
+              let storage = textStorage,
+              storage.length > 0 else { return }
+
+        let selection = selectedRange()
+        let probe = min(max(0, selection.location - 1), storage.length - 1)
+        let paragraph = (storage.string as NSString).paragraphRange(
+            for: NSRange(location: probe, length: 0)
+        )
+        storage.addAttribute(.paragraphStyle, value: style, range: paragraph)
+        pendingParagraphStyle = nil
+        didChangeText()
+    }
+
+    private func toggleChecklistIfNeeded(_ event: NSEvent) -> Bool {
+        guard let controller = richTextController,
+              let storage = textStorage,
+              storage.length > 0 else { return false }
+
+        let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        guard modifiers.isEmpty else { return false }
+
+        let point = convert(event.locationInWindow, from: nil)
+        let index = characterIndexForInsertion(at: point)
+        let nsString = storage.string as NSString
+        let probe = min(max(0, index), nsString.length - 1)
+        let paragraph = nsString.paragraphRange(for: NSRange(location: probe, length: 0))
+
+        guard let style = storage.attribute(
+            .paragraphStyle,
+            at: paragraph.location,
+            effectiveRange: nil
+        ) as? NSParagraphStyle,
+            let list = style.textLists.first,
+            list.markerFormat == .box || list.markerFormat == .check else {
+            return false
+        }
+
+        let x = point.x - textContainerOrigin.x
+        guard x >= 0, x <= style.firstLineHeadIndent + 20 else { return false }
+
+        setSelectedRange(NSRange(location: paragraph.location, length: 0))
+        controller.selectionDidChange()
+        controller.toggleChecklist()
+        return true
+    }
+
+    private enum MarkdownPrefix {
+        case heading(HeadingLevel)
+        case list(ListStyle)
+
+        init?(_ prefix: String) {
+            switch prefix {
+            case "#":
+                self = .heading(.heading1)
+            case "##":
+                self = .heading(.heading2)
+            case "###":
+                self = .heading(.heading3)
+            case "-", "*":
+                self = .list(.bullet)
+            case "[]", "[ ]":
+                self = .list(.task)
+            default:
+                let number = prefix.dropLast()
+                guard prefix.hasSuffix("."),
+                      !number.isEmpty,
+                      number.allSatisfy(\.isNumber) else {
+                    return nil
+                }
+                self = .list(.ordered)
+            }
+        }
     }
 
     private func selectedRichTextData() -> Data? {

@@ -110,6 +110,17 @@ enum ListStyle: String, CaseIterable, Identifiable {
     }
 }
 
+/// Shared presentation values for supported rich-text runs.
+enum RichTextStyle {
+    static var codeBackground: NSColor {
+        NSColor.labelColor.withAlphaComponent(0.08)
+    }
+
+    static var quoteColor: NSColor {
+        .secondaryLabelColor
+    }
+}
+
 /// Normalizes link text so links always have a scheme.
 enum RichTextLink {
     static func normalized(_ value: String?) -> String? {

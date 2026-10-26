@@ -5,6 +5,7 @@ import Testing
 @testable import Blink
 
 @MainActor
+@Suite(.serialized)
 struct RichTextTests {
     @Test
     func archiveRoundTripsFormattingAndLinks() throws {
@@ -142,6 +143,172 @@ struct RichTextTests {
         )
         #expect(quoteOnly.headIndent == 16)
         #expect(quoteOnly.firstLineHeadIndent == 16)
+    }
+
+    @Test
+    func checklistItemsToggleBetweenBoxAndCheck() throws {
+        let textView = makeTextView("Task")
+        let controller = RichTextController()
+        controller.baseFontSize = 16
+        controller.attach(textView)
+        controller.selectionDidChange()
+
+        controller.setList(.task)
+        let storage = try #require(textView.textStorage)
+        let boxStyle = try #require(
+            storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        )
+        #expect(boxStyle.textLists.first?.markerFormat == .box)
+        #expect(controller.isChecklist)
+
+        controller.toggleChecklist()
+        let checkedStyle = try #require(
+            storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        )
+        #expect(checkedStyle.textLists.first?.markerFormat == .check)
+
+        controller.toggleChecklist()
+        let uncheckedStyle = try #require(
+            storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        )
+        #expect(uncheckedStyle.textLists.first?.markerFormat == .box)
+    }
+
+    @Test
+    func codeFormattingAddsAndRemovesItsBackground() throws {
+        let textView = makeTextView("code")
+        let controller = RichTextController()
+        controller.baseFontSize = 16
+        controller.attach(textView)
+        textView.setSelectedRange(NSRange(location: 0, length: 4))
+        controller.selectionDidChange()
+
+        controller.toggleCode()
+        let storage = try #require(textView.textStorage)
+        #expect(storage.attribute(.backgroundColor, at: 0, effectiveRange: nil) != nil)
+
+        controller.toggleCode()
+        #expect(storage.attribute(.backgroundColor, at: 0, effectiveRange: nil) == nil)
+    }
+
+    @Test
+    func indentationStepsListAndQuoteParagraphs() throws {
+        let textView = makeTextView("Item")
+        let controller = RichTextController()
+        controller.baseFontSize = 16
+        controller.attach(textView)
+        controller.selectionDidChange()
+
+        controller.setList(.bullet)
+        let storage = try #require(textView.textStorage)
+        let initial = try #require(
+            storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        )
+        #expect(initial.headIndent == 22)
+
+        controller.adjustIndent(by: 22)
+        let indented = try #require(
+            storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        )
+        #expect(indented.headIndent == 44)
+        #expect(indented.firstLineHeadIndent == 22)
+    }
+
+    @Test
+    func emptyDocumentCanAdoptAParagraphStyle() throws {
+        let textView = makeTextView("")
+        let controller = RichTextController()
+        controller.baseFontSize = 16
+        controller.attach(textView)
+
+        controller.setHeading(.heading2)
+
+        #expect(textView.typingAttributes[.blinkHeading] as? Int == 2)
+        let font = try #require(textView.typingAttributes[.font] as? NSFont)
+        #expect(font.pointSize == HeadingLevel.heading2.size(base: 16))
+    }
+
+    @Test
+    func emptyDocumentCanStartAList() throws {
+        let window = makeWindow()
+        let textView = NotesTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        textView.isRichText = true
+        window.contentView = textView
+        window.makeFirstResponder(textView)
+
+        let controller = RichTextController()
+        controller.baseFontSize = 16
+        textView.richTextController = controller
+        controller.attach(textView)
+        #expect(controller.listStyle == nil)
+
+        controller.setList(.bullet)
+        #expect(textView.string.isEmpty)
+        #expect(textView.textStorage?.length == 0)
+        #expect(textView.defaultParagraphStyle?.textLists.count == 1)
+        #expect(controller.listStyle == .bullet)
+        textView.insertText("Item", replacementRange: NSRange(location: 0, length: 0))
+
+        let storage = try #require(textView.textStorage)
+        let style = try #require(
+            storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        )
+        #expect(style.textLists.count == 1)
+    }
+
+    @Test
+    func markdownPrefixesTurnIntoRichTextOnSpace() throws {
+        let headingWindow = makeWindow()
+        let headingView = NotesTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        headingView.isRichText = true
+        headingWindow.contentView = headingView
+        headingWindow.makeFirstResponder(headingView)
+        let headingController = RichTextController()
+        headingController.baseFontSize = 16
+        headingView.richTextController = headingController
+        headingView.string = "#"
+        headingView.setSelectedRange(NSRange(location: 1, length: 0))
+        headingController.attach(headingView)
+        headingController.selectionDidChange()
+
+        headingView.insertText(" ", replacementRange: NSRange(location: 1, length: 0))
+        headingView.insertText("Title", replacementRange: NSRange(location: 0, length: 0))
+
+        #expect(headingView.string == "Title")
+        #expect(headingView.textStorage?.attribute(.blinkHeading, at: 0, effectiveRange: nil) as? Int == 1)
+        headingWindow.makeFirstResponder(nil)
+
+        let listWindow = makeWindow()
+        let listView = NotesTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        listView.isRichText = true
+        listWindow.contentView = listView
+        listWindow.makeFirstResponder(listView)
+        let listController = RichTextController()
+        listController.baseFontSize = 16
+        listView.richTextController = listController
+        listView.string = "1."
+        listView.setSelectedRange(NSRange(location: 2, length: 0))
+        listController.attach(listView)
+        listController.selectionDidChange()
+
+        listView.insertText(" ", replacementRange: NSRange(location: 2, length: 0))
+        listView.insertText("Item", replacementRange: NSRange(location: 0, length: 0))
+
+        #expect(listView.string == "Item")
+        let storage = try #require(listView.textStorage)
+        let style = try #require(
+            storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        )
+        #expect(style.textLists.first?.markerFormat == .decimal)
+    }
+
+    private func makeWindow() -> NSWindow {
+        NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
     }
 
     private func makeTextView(_ string: String, in window: NSWindow? = nil) -> NSTextView {
