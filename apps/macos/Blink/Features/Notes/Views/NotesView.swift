@@ -127,6 +127,26 @@ struct NotesView: View {
 
             Spacer(minLength: 8)
 
+            if store.hasStorageIssue {
+                Button {
+                    panel = .storage
+                } label: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.orange)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(PointerButtonStyle())
+                .help("Notes storage issue")
+                .accessibilityLabel("Notes storage issue")
+                .popover(isPresented: isPresented(.storage), arrowEdge: .bottom) {
+                    StorageIssuePanel(store: store) {
+                        panel = nil
+                    }
+                }
+            }
+
             if showsControls {
                 actionBar
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))

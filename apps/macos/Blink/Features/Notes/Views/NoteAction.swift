@@ -84,6 +84,7 @@ enum NotesPanel {
     case notes
     case workspaces
     case trash
+    case storage
 }
 
 /// Routes menu-bar commands to the key notes window.
