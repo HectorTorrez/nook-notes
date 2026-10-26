@@ -306,11 +306,12 @@ private struct LinkButton: View {
         } label: {
             Image(systemName: "link")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(controller.link != nil ? Color.accentColor : .primary)
+                .foregroundStyle(linkColor)
                 .frame(width: 30, height: 26)
                 .contentShape(Rectangle())
         }
         .buttonStyle(PointerButtonStyle())
+        .disabled(!controller.hasSelection)
         .popover(isPresented: $shown, arrowEdge: .top) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Link")
@@ -336,8 +337,13 @@ private struct LinkButton: View {
             .padding(12)
             .frame(width: 260)
         }
-        .help("Link")
+        .help(controller.hasSelection ? "Link" : "Select text to add a link")
         .accessibilityLabel("Link")
+    }
+
+    private var linkColor: Color {
+        if !controller.hasSelection { return .secondary }
+        return controller.link != nil ? Color.accentColor : .primary
     }
 
     private func apply() {

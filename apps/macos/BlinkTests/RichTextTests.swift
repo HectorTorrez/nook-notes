@@ -46,4 +46,121 @@ struct RichTextTests {
         #expect(ListStyle(markerFormat: .check) == .task)
         #expect(ListStyle(markerFormat: .hyphen) == nil)
     }
+
+    @Test
+    func changingBaseFontSizeRescalesBodyAndHeadingRuns() throws {
+        let textView = makeTextView("Body\nHeading")
+        let controller = RichTextController()
+        controller.baseFontSize = 16
+        controller.attach(textView)
+
+        textView.setSelectedRange(NSRange(location: 5, length: 0))
+        controller.selectionDidChange()
+        controller.setHeading(.heading1)
+
+        controller.baseFontSize = 21
+        controller.restyleFonts()
+
+        let storage = try #require(textView.textStorage)
+        let body = try #require(storage.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+        let heading = try #require(storage.attribute(.font, at: 5, effectiveRange: nil) as? NSFont)
+
+        #expect(body.pointSize == 21)
+        #expect(heading.pointSize == 36)
+    }
+
+    @Test
+    func caretFormattingUpdatesTypingAttributesWithoutChangingText() throws {
+        let textView = makeTextView("Hello")
+        let controller = RichTextController()
+        controller.baseFontSize = 16
+        controller.attach(textView)
+
+        textView.setSelectedRange(NSRange(location: 2, length: 0))
+        controller.selectionDidChange()
+        controller.toggleBold()
+
+        let typingFont = try #require(textView.typingAttributes[.font] as? NSFont)
+        #expect(NSFontManager.shared.traits(of: typingFont).contains(.boldFontMask))
+
+        let storage = try #require(textView.textStorage)
+        let storedFont = try #require(storage.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+        #expect(NSFontManager.shared.traits(of: storedFont).contains(.boldFontMask) == false)
+    }
+
+    @Test
+    func formattingIsUndoableAndRedoable() throws {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        let textView = makeTextView("Hello", in: window)
+        textView.allowsUndo = true
+        textView.undoManager?.removeAllActions()
+        textView.setSelectedRange(NSRange(location: 0, length: 5))
+
+        let controller = RichTextController()
+        controller.baseFontSize = 16
+        controller.attach(textView)
+        controller.selectionDidChange()
+        controller.toggleBold()
+
+        #expect(isBold(0, in: textView))
+
+        textView.undoManager?.undo()
+        #expect(isBold(0, in: textView) == false)
+
+        textView.undoManager?.redo()
+        #expect(isBold(0, in: textView))
+    }
+
+    @Test
+    func listAndQuoteFormattingShareIndentationWithoutFighting() throws {
+        let textView = makeTextView("A list item")
+        let controller = RichTextController()
+        controller.baseFontSize = 16
+        controller.attach(textView)
+        controller.selectionDidChange()
+
+        controller.setList(.bullet)
+        controller.toggleBlockquote()
+
+        let storage = try #require(textView.textStorage)
+        let quotedList = try #require(
+            storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        )
+        #expect(quotedList.lineSpacing == NotesTextEditor.lineSpacing)
+        #expect(quotedList.headIndent == 38)
+        #expect(quotedList.firstLineHeadIndent == 16)
+
+        controller.setList(.bullet)
+
+        let quoteOnly = try #require(
+            storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        )
+        #expect(quoteOnly.headIndent == 16)
+        #expect(quoteOnly.firstLineHeadIndent == 16)
+    }
+
+    private func makeTextView(_ string: String, in window: NSWindow? = nil) -> NSTextView {
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        if let window {
+            window.contentView = textView
+        }
+        textView.string = string
+        textView.textStorage?.setAttributes(
+            NotesTextEditor.baseAttributes(fontSize: 16),
+            range: NSRange(location: 0, length: (string as NSString).length)
+        )
+        return textView
+    }
+
+    private func isBold(_ index: Int, in textView: NSTextView) -> Bool {
+        guard let font = textView.textStorage?.attribute(.font, at: index, effectiveRange: nil) as? NSFont else {
+            return false
+        }
+        return NSFontManager.shared.traits(of: font).contains(.boldFontMask)
+    }
 }

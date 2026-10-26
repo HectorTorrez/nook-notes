@@ -17,6 +17,16 @@ struct NotesTextEditor: NSViewRepresentable {
     static let topInset: CGFloat = 6
     static let lineSpacing: CGFloat = 6
 
+    static func baseAttributes(fontSize: CGFloat) -> [NSAttributedString.Key: Any] {
+        let style = NSMutableParagraphStyle()
+        style.lineSpacing = lineSpacing
+        return [
+            .font: NSFont.systemFont(ofSize: fontSize),
+            .foregroundColor: NSColor.labelColor,
+            .paragraphStyle: style,
+        ]
+    }
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
@@ -56,6 +66,11 @@ struct NotesTextEditor: NSViewRepresentable {
         textView.isAutomaticLinkDetectionEnabled = false
         textView.isAutomaticDataDetectionEnabled = false
         textView.insertionPointColor = NSColor(caretColor)
+        textView.linkTextAttributes = [
+            .foregroundColor: NSColor.linkColor,
+            .underlineStyle: NSUnderlineStyle.single.rawValue,
+            .cursor: NSCursor.pointingHand,
+        ]
         textView.setAccessibilityLabel("Note")
 
         textView.onCancel = { [weak coordinator = context.coordinator] in
@@ -119,7 +134,22 @@ struct NotesTextEditor: NSViewRepresentable {
 
         func textViewDidChangeSelection(_ notification: Notification) {
             guard notification.object is NSTextView else { return }
-            parent.controller.refresh()
+            parent.controller.selectionDidChange()
+        }
+
+        func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
+            let url: URL?
+            switch link {
+            case let value as URL:
+                url = value
+            case let value as String:
+                url = URL(string: value)
+            default:
+                url = nil
+            }
+            guard let url else { return false }
+            NSWorkspace.shared.open(url)
+            return true
         }
 
         /// Replaces the text view's contents with the note's stored rich text, or plain
@@ -137,13 +167,7 @@ struct NotesTextEditor: NSViewRepresentable {
         }
 
         private var baseAttributes: [NSAttributedString.Key: Any] {
-            let style = NSMutableParagraphStyle()
-            style.lineSpacing = NotesTextEditor.lineSpacing
-            return [
-                .font: NSFont.systemFont(ofSize: parent.fontSize),
-                .foregroundColor: NSColor.labelColor,
-                .paragraphStyle: style,
-            ]
+            NotesTextEditor.baseAttributes(fontSize: parent.fontSize)
         }
 
         private func applyBaseTypography(to textView: NSTextView) {
