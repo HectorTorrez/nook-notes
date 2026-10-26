@@ -72,7 +72,7 @@ struct NotesView: View {
                 richTextData: note.richTextData,
                 fontSize: fontSize,
                 preferences: editorPreferences,
-                accessibilityLabel: note.isEmpty ? "Note" : "Note, \(note.title)",
+                accessibilityLabel: editorAccessibilityLabel,
                 caretColor: accent,
                 controller: formatController,
                 onTextChange: { noteID, text in
@@ -328,9 +328,14 @@ struct NotesView: View {
         return true
     }
 
+    private var editorAccessibilityLabel: String {
+        let noteLabel = String(localized: "Note")
+        return note.isEmpty ? noteLabel : "\(noteLabel), \(note.title)"
+    }
+
     private var wordCountLabel: String {
         let count = note.content.split(whereSeparator: \.isWhitespace).count
-        return count == 1 ? "1 word" : "\(count) words"
+        return LocalizedCount.words(count)
     }
 
     private func showNotes() {

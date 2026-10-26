@@ -24,7 +24,7 @@ struct Workspace: Identifiable, Equatable, Sendable, Codable {
     }
 
     var noteCountLabel: String {
-        notes.count == 1 ? "1 note" : "\(notes.count) notes"
+        LocalizedCount.notes(notes.count)
     }
 
     private enum CodingKeys: String, CodingKey {
