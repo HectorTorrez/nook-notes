@@ -48,6 +48,8 @@ final class WindowChromeView: NSView {
         // so a click outside the window only changes focus.
         window.collectionBehavior.insert(.stationary)
 
+        window.isReleasedWhenClosed = false
+        AppWindow.storedWindow = window
         window.setFrameAutosaveName("BlinkMainWindow")
         clampToVisibleScreen(window)
         applyLevel()
