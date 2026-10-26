@@ -493,6 +493,26 @@ final class RichTextController {
         textView.didChangeText()
     }
 
+    /// Shows the in-note find bar.
+    func showFindPanel() {
+        performFind(.showFindPanel)
+    }
+
+    func findNext() {
+        performFind(.next)
+    }
+
+    func findPrevious() {
+        performFind(.previous)
+    }
+
+    private func performFind(_ action: NSFindPanelAction) {
+        guard let textView else { return }
+        let item = NSMenuItem()
+        item.tag = Int(action.rawValue)
+        textView.performFindPanelAction(item)
+    }
+
     /// Drops the selection so the formatting bar can collapse.
     func dismiss() {
         guard let textView else { return }
