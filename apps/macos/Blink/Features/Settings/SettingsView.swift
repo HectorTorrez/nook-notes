@@ -19,6 +19,7 @@ private struct AppearanceSettingsView: View {
     @AppStorage(Theme.accentPaletteKey) private var accentPalette: AccentPalette = Theme.defaultAccentPalette
     @AppStorage("fontSize") private var fontSize: Double = 16
     @AppStorage("backgroundOpacity") private var backgroundOpacity: Double = 0.75
+    @AppStorage("alwaysOnTop") private var alwaysOnTop = true
     @AppStorage(EditorSettings.fontFamilyKey) private var fontFamily: EditorFontFamily = .system
 
     var body: some View {
@@ -37,6 +38,10 @@ private struct AppearanceSettingsView: View {
                     }
                 }
                 .pickerStyle(.menu)
+            }
+
+            Section("Window") {
+                Toggle("Float above other apps", isOn: $alwaysOnTop)
             }
 
             Section("Background") {
