@@ -58,6 +58,12 @@ The script builds a Release version and copies it to `/Applications/Blink.app`. 
 
 Open `apps/macos/Blink.xcodeproj` in Xcode and press **Run**.
 
+Run the unit tests before merging:
+
+```bash
+./apps/macos/scripts/test.sh
+```
+
 To regenerate the app icon after editing the drawing code:
 
 ```bash

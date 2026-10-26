@@ -16,11 +16,11 @@ struct NotesTextEditor: NSViewRepresentable {
     /// key, or `false` to let the text view's default behavior run.
     var onEscape: () -> Bool
 
-    static let horizontalInset: CGFloat = 24
-    static let topInset: CGFloat = 6
-    static let lineSpacing: CGFloat = 6
+    nonisolated static let horizontalInset: CGFloat = 24
+    nonisolated static let topInset: CGFloat = 6
+    nonisolated static let lineSpacing: CGFloat = 6
 
-    static func baseAttributes(
+    nonisolated static func baseAttributes(
         fontSize: CGFloat,
         family: EditorFontFamily = .system
     ) -> [NSAttributedString.Key: Any] {
