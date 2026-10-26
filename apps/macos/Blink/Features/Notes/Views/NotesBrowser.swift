@@ -19,6 +19,7 @@ struct NotesBrowser: View {
             items: store.notesByRecency,
             rowHeight: 50,
             listCaption: noteCountLabel,
+            listNoun: "note",
             emptyIcon: "note.text",
             matches: { note, query in
                 note.content.localizedCaseInsensitiveContains(query)
@@ -50,7 +51,7 @@ struct NotesBrowser: View {
                                         .fill(accent.opacity(0.16))
                                 }
                         } else {
-                            Text(OpenedWhen.label(for: note.lastOpenedAt, now: listedAt))
+                            Text(OpenedWhen.label(for: note.modifiedAt, now: listedAt))
                                 .foregroundStyle(.secondary)
                         }
                         Text("·")
@@ -62,6 +63,31 @@ struct NotesBrowser: View {
                     .lineLimit(1)
                 }
                 .padding(.trailing, 52)
+                .contextMenu {
+                    Button(note.isPinned ? "Unpin" : "Pin") {
+                        store.togglePin(note.id)
+                    }
+                    Button("Duplicate") {
+                        store.duplicateNote(note.id)
+                    }
+                    if store.workspaces.count > 1 {
+                        Menu("Move to Workspace") {
+                            ForEach(
+                                store.workspaces.filter {
+                                    $0.id != store.selectedWorkspaceID
+                                }
+                            ) { workspace in
+                                Button(workspace.name) {
+                                    store.moveNote(note.id, to: workspace.id)
+                                }
+                            }
+                        }
+                    }
+                    Divider()
+                    Button("Delete", role: .destructive) {
+                        store.deleteNote(note.id)
+                    }
+                }
             },
             trailing: { note in
                 HStack(spacing: 0) {
