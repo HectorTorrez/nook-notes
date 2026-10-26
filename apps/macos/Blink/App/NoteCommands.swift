@@ -11,6 +11,23 @@ struct NoteCommands: Commands {
             button(for: .newNote)
         }
 
+        CommandGroup(after: .importExport) {
+            Button("Export Note…") {
+                NoteFileActions.exportSelected(from: store)
+            }
+            .keyboardShortcut("e", modifiers: [.command, .shift])
+            .disabled(store.selectedNote.isEmpty)
+
+            Button("Export All Notes…") {
+                NoteFileActions.exportAll(from: store)
+            }
+
+            Button("Import Notes…") {
+                NoteFileActions.importNotes(into: store)
+            }
+            .keyboardShortcut("i", modifiers: [.command, .shift])
+        }
+
         CommandGroup(after: .pasteboard) {
             Divider()
             Button("Find…") { format?.showFindPanel() }

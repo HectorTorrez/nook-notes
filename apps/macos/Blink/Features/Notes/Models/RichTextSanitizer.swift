@@ -140,12 +140,14 @@ enum RichTextSanitizer {
         style.paragraphSpacingBefore = level?.paragraphSpacingBefore ?? 0
 
         let hasList = !style.textLists.isEmpty
-        let listIndent: CGFloat = hasList ? 22 : 0
         let quoteIndent: CGFloat = isQuote ? 16 : 0
-        style.headIndent = listIndent + quoteIndent
-        style.firstLineHeadIndent = quoteIndent
+        let existingIndent = existing?.headIndent ?? 22
+        let level = hasList ? max(0, Int(((existingIndent - 22) / 22).rounded())) : 0
+        let baseIndent = CGFloat(level) * 22
+        style.firstLineHeadIndent = baseIndent + quoteIndent
+        style.headIndent = (hasList ? baseIndent + 22 : 0) + quoteIndent
         style.tabStops = hasList
-            ? [NSTextTab(textAlignment: .left, location: listIndent + quoteIndent)]
+            ? [NSTextTab(textAlignment: .left, location: baseIndent + 22 + quoteIndent)]
             : []
 
         return style
