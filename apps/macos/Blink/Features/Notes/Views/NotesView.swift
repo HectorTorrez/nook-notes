@@ -173,7 +173,7 @@ struct NotesView: View {
 
     @ViewBuilder
     private var placeholder: some View {
-        if note.content.isEmpty {
+        if note.isEmpty {
             Text("Start writing…")
                 .font(.system(size: fontSize))
                 .foregroundStyle(.secondary)
